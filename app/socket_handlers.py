@@ -10,9 +10,9 @@ from typing import Dict, Any
 from .game_state import (
     game_state, get_my_bomber, get_my_cell,
     fast_init_from_user, fast_handle_new_bomb, fast_handle_bomb_explode, fast_handle_map_update,
-    build_item_tile_map, build_chest_tile_map, pos_to_cell_bot, pos_to_cell
+    build_item_tile_map, build_chest_tile_map, pos_to_cell_bot, pos_to_cell, pos_to_cell_entity
 )
-from .main import log_map_state
+from .utils.map_logger import log_map_state
 from .config import CELL_SIZE, BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, LOG_BOMB_EVENTS
 
 # Sử dụng pos_to_cell từ game_state thay vì định nghĩa lại
@@ -147,7 +147,7 @@ def handle_user(data: Dict[str, Any]):
     logger.info(f"🗺️ BẢN ĐỒ BAN ĐẦU: items={len(item_tile_map)}, chests={len(chest_tile_map)}")
     
     # Vẽ map ban đầu
-    log_map_state()
+    log_map_state(game_state, log_enabled=True)
 
     # Khởi tạo fast_state (bitmask) để AI dùng hiệu năng cao
     try:
@@ -240,7 +240,7 @@ def handle_player_move(data: Dict[str, Any]):
     if uid == game_state.get("my_uid"):
         for bomb in game_state["bombs"]:
             if bomb.get("uid") == uid and not bomb.get("bomberPassedThrough", False):
-                bomb_cell = pos_to_cell(bomb.get("x", 0), bomb.get("y", 0))
+                bomb_cell = pos_to_cell_entity(bomb.get("x", 0), bomb.get("y", 0))
                 current_cell = pos_to_cell(data.get("x", 0), data.get("y", 0))
                 if bomb_cell != current_cell:
                     bomb["bomberPassedThrough"] = True
@@ -267,7 +267,7 @@ def handle_new_bomb(data: Dict[str, Any]):
     
     # Cập nhật bomb_tile_map
     bomb_x, bomb_y = data.get("x", 0), data.get("y", 0)
-    tile_x, tile_y = pos_to_cell(bomb_x, bomb_y)
+    tile_x, tile_y = pos_to_cell_entity(bomb_x, bomb_y)
     bomb_tile_map = game_state.get("bomb_tile_map", {})
     bomb_tile_map[(tile_x, tile_y)] = True
     game_state["bomb_tile_map"] = bomb_tile_map
@@ -305,7 +305,7 @@ def handle_new_bomb(data: Dict[str, Any]):
         logger.exception(f"Bomb tracker add error: {e}")
     
     # Vẽ lại map sau khi đặt bom
-    log_map_state()
+    log_map_state(game_state, log_enabled=True)
 
     # Cập nhật FastState
     try:
@@ -431,7 +431,7 @@ def handle_bomb_explode(data: Dict[str, Any]):
     # Cập nhật bomb_tile_map - xóa bom đã nổ
     if exploded_bomb:
         bomb_x, bomb_y = exploded_bomb.get("x", 0), exploded_bomb.get("y", 0)
-        tile_x, tile_y = pos_to_cell(bomb_x, bomb_y)
+        tile_x, tile_y = pos_to_cell_entity(bomb_x, bomb_y)
         bomb_tile_map = game_state.get("bomb_tile_map", {})
         if (tile_x, tile_y) in bomb_tile_map:
             del bomb_tile_map[(tile_x, tile_y)]
@@ -439,7 +439,7 @@ def handle_bomb_explode(data: Dict[str, Any]):
             logger.info(f"🗺️ XÓA BOM tile=({tile_x+1}, {tile_y+1})")
     
     # Vẽ lại map sau khi bom nổ
-    log_map_state()
+    log_map_state(game_state, log_enabled=True)
 
     # Cập nhật FastState hazards
     try:
@@ -515,7 +515,7 @@ def handle_map_update(data: Dict[str, Any]):
     logger.info(f"🗺️ MAP UPDATE: Hiển thị map mới sau khi cập nhật")
     # Tạm thời bỏ force=True để tránh lỗi
     try:
-        log_map_state()
+        log_map_state(game_state, log_enabled=True)
     except Exception as e:
         logger.exception(f"❌ LỖI LOG MAP: {e}")
 
@@ -560,7 +560,7 @@ def handle_item_collected(data: Dict[str, Any]):
     # Cập nhật item_tile_map - xóa item đã được nhặt
     if item:
         item_x, item_y = item.get("x", 0), item.get("y", 0)
-        tile_x, tile_y = pos_to_cell(item_x, item_y)
+        tile_x, tile_y = pos_to_cell_entity(item_x, item_y)
         
         # Xóa item khỏi bản đồ
         item_tile_map = game_state.get("item_tile_map", {})
@@ -578,7 +578,7 @@ def handle_item_collected(data: Dict[str, Any]):
         logger.info(f"💎 NHẶT ITEM: {item.get('type')} - Tốc độ: {bomber.get('speed')} - SPEED items: {bomber.get('speedCount')}")
     
     # Vẽ lại map sau khi nhặt item
-    log_map_state()
+    log_map_state(game_state, log_enabled=True)
 
 def handle_chest_destroyed(data: Dict[str, Any]):
     """Xử lý rương bị phá"""
@@ -590,7 +590,7 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     item = data.get("item")
     if item:
         item_x, item_y = item.get("x", 0), item.get("y", 0)
-        tile_x, tile_y = pos_to_cell(item_x, item_y)
+        tile_x, tile_y = pos_to_cell_entity(item_x, item_y)
         item_type = item.get("type", "")
         
         # Thêm item vào bản đồ
@@ -601,7 +601,7 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     
     # Cập nhật chest_tile_map - xóa rương đã bị phá
     chest_x, chest_y = data.get("x", 0), data.get("y", 0)
-    tile_x, tile_y = pos_to_cell(chest_x, chest_y)
+    tile_x, tile_y = pos_to_cell_entity(chest_x, chest_y)
     chest_tile_map = game_state.get("chest_tile_map", {})
     if (tile_x, tile_y) in chest_tile_map:
         del chest_tile_map[(tile_x, tile_y)]
@@ -610,7 +610,7 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     
     # Vẽ lại map sau khi rương bị phá
     # Tạm thời bỏ force=True để tránh lỗi
-    log_map_state()
+    log_map_state(game_state, log_enabled=True)
     
     # Tính lại kế hoạch AI sau khi rương bị phá - CHỈ NÊN RESET NÊU RƯƠNG LÀ TARGET
     try:
@@ -712,7 +712,7 @@ def handle_user_disconnect(data: Dict[str, Any]):
 def handle_new_life(data: Dict[str, Any]):
     """Xử lý bot hồi sinh (chỉ có ở môi trường luyện tập)"""
     # Log response data quan trọng
-    logger.info(f"📥 NEW_LIFE RESPONSE: {data}")
+    logger.info(f"📥 NEW_LIFE RESPONSE: {data.get('killed', {}).get('name')}")
     
     # Kiểm tra xem có phải bot của mình không
     killed_data = data.get("killed", {})

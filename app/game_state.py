@@ -49,33 +49,70 @@ def get_grid_size() -> Tuple[int, int]:
     mp = game_state.get("map") or []
     return (len(mp[0]) if mp else 0, len(mp))
 
-def pos_to_cell(x: float, y: float) -> Tuple[int, int]:
+def pos_to_cell(x: float, y: float) -> Tuple[float, float]:
     """
     Chuyển vị trí pixel (TOP-LEFT của bot) thành tọa độ ô lưới.
     
     === QUAN TRỌNG: TẤT CẢ TỌA ĐỘ TỪ SERVER ĐỀU LÀ TOP-LEFT (góc trên trái) ===
     
     Map: 640x640px, chia thành 16x16 cells, mỗi cell 40x40px
-    - Cell 0: pixel từ 0-39 (góc trên trái: 0,0 - góc dưới phải: 39,39)
-    - Cell 1: pixel từ 40-79 (góc trên trái: 40,40 - góc dưới phải: 79,79)
-    - Cell 2: pixel từ 80-119
+    - Cell 0: pixel từ 0-39 (bot cho là đã tới ô này phải có vị trí 0 đến 5, khi này trả về 0), nếu nằm từ 6 đến 39 thì trả về 0.5
+    - Cell 1: pixel từ 40-79 (bot cho là đã tới ô này phải có vị trí 40 đến 45, khi này trả về 1), nếu nằm từ 46 đến 79 thì trả về 1.5
+    - Cell 2: pixel từ 80-119 (bot cho là đã tới ô này phải có vị trí 80 đến 85, khi này trả về 2), nếu nằm từ 86 đến 119 thì trả về 2.5
     - ...
-    - Cell 15: pixel từ 600-639
+    - Cell 15: pixel từ 600-639 (bot cho là đã tới ô này phải có vị trí 600 đến 605, khi này trả về 15), nếu nằm từ 606 đến 639 thì trả về 15.5
     
     Bot: 35x35px
-    - Server trả về (x, y) = top-left của bot
-    - Bot chiếm từ (x, y) đến (x+34, y+34)
+    - Server trả về (x, y) = top-left của bot, check như logic bên trên đã note
     
-    Ví dụ: Bot top-left tại (40, 40)
-    - Bot chiếm: x từ 40-74, y từ 40-74
-    - Nằm hoàn toàn trong Cell 1 (40-79)
-    - pos_to_cell(40, 40) = (1, 1) ✓
-    
-    Logic: Cell = floor(top_left / CELL_SIZE)
     """
     from .config import CELL_SIZE
     
-    # Tính cell dựa trên top-left
+    # Logic mới: Trả về float để biểu diễn vị trí chính xác trong cell
+    # 
+    # VD: Cell 1 (40-79px)
+    # - x=40-45 → trả về 1.0 (đã tới chính xác)
+    # - x=46-79 → trả về 1.5 (đang ở giữa cell)
+    # 
+    # VD: Cell 2 (80-119px)  
+    # - x=80-85 → trả về 2.0 (đã tới chính xác)
+    # - x=86-119 → trả về 2.5 (đang ở giữa cell)
+    
+    # Tính cell base
+    cell_x = x // CELL_SIZE
+    cell_y = y // CELL_SIZE
+    
+    # Tính offset trong cell (0-39px)
+    offset_x = x % CELL_SIZE
+    offset_y = y % CELL_SIZE
+    
+    # Logic: Nếu offset <= 5px → đã tới chính xác (số nguyên)
+    # Nếu offset > 5px → đang ở giữa cell (số lẻ .5)
+    if offset_x <= 5:
+        cx = cell_x
+    else:
+        cx = cell_x + 0.5
+        
+    if offset_y <= 5:
+        cy = cell_y  
+    else:
+        cy = cell_y + 0.5
+    
+    # Clamp vào range hợp lệ (0-15.5)
+    cx = max(0, min(15.5, cx))
+    cy = max(0, min(15.5, cy))
+    
+    return (cx, cy)
+
+def pos_to_cell_entity(x: float, y: float) -> Tuple[int, int]:
+    """
+    Chuyển pixel thành cell cho entity 40x40px (BOM, ITEM, CHEST).
+    
+    Entity 40x40px = đúng bằng CELL_SIZE → Dùng floor(x/40) thuần túy
+    Không cần offset vì entity chiếm ĐÚNG 1 cell!
+    """
+    from .config import CELL_SIZE
+    
     cx = int(x // CELL_SIZE)
     cy = int(y // CELL_SIZE)
     
@@ -88,6 +125,19 @@ def pos_to_cell(x: float, y: float) -> Tuple[int, int]:
 def pos_to_cell_bot(x: float, y: float) -> Tuple[int, int]:
     """Phân loại tile của bot dựa trên góc trên trái (top-left): floor(x/40), floor(y/40)."""
     return pos_to_cell(x, y)
+
+def pos_to_cell_int(x: float, y: float) -> Tuple[int, int]:
+    """Chuyển pixel thành cell integer (cho pathfinding, map display)"""
+    cell_x, cell_y = pos_to_cell(x, y)
+    return (int(cell_x), int(cell_y))
+
+def is_at_exact_cell(x: float, y: float) -> bool:
+    """Kiểm tra bot có đang ở chính xác cell không (số nguyên)"""
+    cell_x, cell_y = pos_to_cell(x, y)
+    return (
+        isinstance(cell_x, int) or cell_x.is_integer() and
+        isinstance(cell_y, int) or cell_y.is_integer()
+    )
 
 def cell_to_pos(cx: int, cy: int) -> Tuple[int, int]:
     """Chuyển ô lưới thành vị trí pixel (tâm ô)"""
