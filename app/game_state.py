@@ -134,6 +134,7 @@ def pos_to_cell_int(x: float, y: float) -> Tuple[int, int]:
 def is_at_exact_cell(x: float, y: float) -> bool:
     """Kiểm tra bot có đang ở chính xác cell không (số nguyên)"""
     cell_x, cell_y = pos_to_cell(x, y)
+    # Phải là số nguyên hoặc float có phần thập phân = 0
     return (
         (isinstance(cell_x, int) or (isinstance(cell_x, float) and cell_x.is_integer())) and
         (isinstance(cell_y, int) or (isinstance(cell_y, float) and cell_y.is_integer()))
@@ -174,6 +175,8 @@ def is_passable(cx: int, cy: int) -> bool:
             logger.warning(f"⚠️ MAP SIZE ERROR: mp={len(mp)}x{len(mp[0]) if mp else 'empty'}, trying to access ({cx}, {cy})")
         return False
         
+    # Convert float to int for array indexing
+    cx, cy = int(cx), int(cy)
     cell = mp[cy][cx]
     return not is_blocked_cell(cell)
 

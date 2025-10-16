@@ -64,8 +64,9 @@ class EscapePlanner:
         blast_zone = EscapePlanner._calculate_blast_zone(bomb_position, explosion_range)
         
         # Tìm các safe cells gần nhất (ngoài blast zone)
+        # QUAN TRỌNG: Tính escape từ vị trí đặt bom, không phải vị trí hiện tại
         safe_cells = EscapePlanner._find_nearest_safe_cells(
-            bot_position, blast_zone, max_distance=8
+            bomb_position, blast_zone, max_distance=8
         )
         
         if not safe_cells:
@@ -79,16 +80,19 @@ class EscapePlanner:
         best_path = None
         best_time = float('inf')
         
+        logger.info(f"🛡️ TÌM ĐƯỜNG THOÁT: từ {bomb_position} đến {safe_cells[:5]}")
+        
         for safe_cell in safe_cells[:5]:  # Chỉ thử 5 ô gần nhất
-            # Tìm đường đi
-            path = astar_shortest_path(bot_position, safe_cell, avoid_hazard=True, avoid_bots=False)
+            # Tìm đường đi từ vị trí đặt bom
+            path = astar_shortest_path(bomb_position, safe_cell, avoid_hazard=True, avoid_bots=False)
             
             if path and len(path) > 1:
                 # Tính thời gian cần thiết
                 escape_time = EscapePlanner.calculate_escape_time(len(path) - 1, bot_speed)
+                logger.info(f"🛡️ THỬ ĐƯỜNG: {bomb_position} → {safe_cell} ({len(path)-1} ô, {escape_time:.0f}ms)")
                 
-                # Kiểm tra có đủ thời gian không (cần thêm 30% safety margin)
-                if escape_time < bomb_lifetime * 0.7:  # Chỉ dùng 70% thời gian
+                # Kiểm tra có đủ thời gian không (cần thêm 20% safety margin)
+                if escape_time < bomb_lifetime * 0.8:  # Chỉ dùng 80% thời gian
                     if escape_time < best_time:
                         best_time = escape_time
                         best_path = path
@@ -99,6 +103,7 @@ class EscapePlanner:
                         )
         
         if best_path:
+            logger.info(f"✅ TÌM THẤY ĐƯỜNG THOÁT TỐT NHẤT: {best_path[0]} → {best_path[-1]} ({best_time:.0f}ms)")
             return (best_path, best_time)
         
         logger.warning(f"⚠️ KHÔNG CÓ ĐƯỜNG THOÁT ĐỦ NHANH từ {bomb_position}")
@@ -118,6 +123,8 @@ class EscapePlanner:
         
         # Tính vùng nổ theo 4 hướng
         map_data = game_state.get("map", [])
+        
+        logger.info(f"💥 TÍNH BLAST ZONE: bom tại {bomb_position}, tầm nổ={explosion_range}")
         
         for direction, (dx, dy) in DIRECTIONS.items():
             for distance in range(1, explosion_range + 1):
@@ -147,6 +154,7 @@ class EscapePlanner:
                 except:
                     break
         
+        logger.info(f"💥 BLAST ZONE: {sorted(blast_zone)}")
         return blast_zone
     
     @staticmethod

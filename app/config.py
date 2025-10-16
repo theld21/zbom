@@ -23,7 +23,8 @@ LOG_AI = os.getenv("LOG_AI", "true").lower() == "true"
 LOG_SOCKET = os.getenv("LOG_SOCKET", "false").lower() == "true"
 LOG_GAME_EVENTS = os.getenv("LOG_GAME_EVENTS", "true").lower() == "true"
 LOG_ITEM_COLLECTION = os.getenv("LOG_ITEM_COLLECTION", "false").lower() == "true"
-LOG_BOMB_EVENTS = os.getenv("LOG_BOMB_EVENTS", "false").lower() == "true"
+LOG_BOMB_EVENTS = os.getenv("LOG_BOMB_EVENTS", "true").lower() == "true"
+LOG_ARRIVAL_CHECK = os.getenv("LOG_ARRIVAL_CHECK", "true").lower() == "true"
 
 # ---------- Hằng số game ----------
 # Kích thước map (theo spec: 640x640 px)

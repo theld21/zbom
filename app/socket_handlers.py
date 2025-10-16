@@ -10,7 +10,7 @@ from typing import Dict, Any
 from .game_state import (
     game_state, get_my_bomber, get_my_cell,
     fast_init_from_user, fast_handle_new_bomb, fast_handle_bomb_explode, fast_handle_map_update,
-    build_item_tile_map, build_chest_tile_map, pos_to_cell_bot, pos_to_cell, pos_to_cell_entity
+    build_item_tile_map, build_chest_tile_map, pos_to_cell_bot, pos_to_cell, pos_to_cell_entity, pos_to_cell_int
 )
 from .utils.map_logger import log_map_state
 from .config import CELL_SIZE, BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, LOG_BOMB_EVENTS
@@ -96,8 +96,13 @@ def handle_user(data: Dict[str, Any]):
     uids = [b.get("uid") for b in game_state["bombers"]]
     logger.info(f"🔍 TÌM BOT: my_uid={game_state['my_uid']} không có trong danh sách {uids}")
     
+    # Debug: Log tất cả bombers
+    for i, b in enumerate(game_state["bombers"]):
+        logger.info(f"🔍 BOMBER {i}: name='{b.get('name')}' uid='{b.get('uid')}'")
+    
     if game_state["my_uid"] not in uids and uids:
         # Ưu tiên chọn theo tên bot cấu hình
+        logger.info(f"🔍 TÌM BOT THEO TÊN: BOT_NAME='{BOT_NAME}'")
         mine = next((b for b in game_state["bombers"] 
                     if isinstance(b.get("name"), str) and b["name"].lower() == BOT_NAME.lower()), None)
         if mine:
@@ -119,9 +124,8 @@ def handle_user(data: Dict[str, Any]):
     try:
         for b in game_state.get("bombers", []):
             bx, by = b.get("x", 0), b.get("y", 0)
-            tx, ty = pos_to_cell_bot(bx, by)
-            # In 1-based chuẩn cho cả hai trục: (cx+1, cy+1)
-            logger.info(f"SPAWN MAPPED: {b.get('name')} ({b.get('uid')}) pixel=({bx},{by}) tile=({tx+1},{ty+1})")
+            tx, ty = pos_to_cell_int(bx, by)
+            logger.info(f"SPAWN MAPPED: {b.get('name')} ({b.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
     except Exception:
         pass
 
@@ -271,7 +275,7 @@ def handle_new_bomb(data: Dict[str, Any]):
     bomb_tile_map = game_state.get("bomb_tile_map", {})
     bomb_tile_map[(tile_x, tile_y)] = True
     game_state["bomb_tile_map"] = bomb_tile_map
-    logger.info(f"🗺️ THÊM BOM tile=({tile_x+1}, {tile_y+1})")
+    logger.info(f"🗺️ THÊM BOM tile=({tile_x}, {tile_y})")
     
     # === THÊM VÀO BOMB TRACKER ===
     try:
@@ -436,7 +440,7 @@ def handle_bomb_explode(data: Dict[str, Any]):
         if (tile_x, tile_y) in bomb_tile_map:
             del bomb_tile_map[(tile_x, tile_y)]
             game_state["bomb_tile_map"] = bomb_tile_map
-            logger.info(f"🗺️ XÓA BOM tile=({tile_x+1}, {tile_y+1})")
+            logger.info(f"🗺️ XÓA BOM tile=({tile_x}, {tile_y})")
     
     # Vẽ lại map sau khi bom nổ
     log_map_state(game_state, log_enabled=True)
@@ -567,7 +571,7 @@ def handle_item_collected(data: Dict[str, Any]):
         if (tile_x, tile_y) in item_tile_map:
             del item_tile_map[(tile_x, tile_y)]
             game_state["item_tile_map"] = item_tile_map
-            logger.info(f"🗺️ XÓA ITEM: {item.get('type')} tại tile ({tile_x+1}, {tile_y+1})")
+            logger.info(f"🗺️ XÓA ITEM: {item.get('type')} tại tile ({tile_x}, {tile_y})")
     
     if bomber and bomber.get("uid") == game_state.get("my_uid"):
         # Cập nhật bomber của chúng ta
@@ -597,7 +601,7 @@ def handle_chest_destroyed(data: Dict[str, Any]):
         item_tile_map = game_state.get("item_tile_map", {})
         item_tile_map[(tile_x, tile_y)] = item_type
         game_state["item_tile_map"] = item_tile_map
-        logger.info(f"🗺️ THÊM ITEM: {item_type} tại tile ({tile_x+1}, {tile_y+1})")
+        logger.info(f"🗺️ THÊM ITEM: {item_type} tại tile ({tile_x}, {tile_y})")
     
     # Cập nhật chest_tile_map - xóa rương đã bị phá
     chest_x, chest_y = data.get("x", 0), data.get("y", 0)
@@ -606,7 +610,7 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     if (tile_x, tile_y) in chest_tile_map:
         del chest_tile_map[(tile_x, tile_y)]
         game_state["chest_tile_map"] = chest_tile_map
-        logger.info(f"🗺️ XÓA RƯƠNG: tại tile ({tile_x+1}, {tile_y+1})")
+        logger.info(f"🗺️ XÓA RƯƠNG: tại tile ({tile_x}, {tile_y})")
     
     # Vẽ lại map sau khi rương bị phá
     # Tạm thời bỏ force=True để tránh lỗi
@@ -654,8 +658,8 @@ def handle_new_enemy(data: Dict[str, Any]):
                    f"speed={bomber.get('speed')} - alive={bomber.get('isAlive')}")
         try:
             bx, by = bomber.get("x", 0), bomber.get("y", 0)
-            tx, ty = pos_to_cell_bot(bx, by)
-            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx+1},{ty+1})")
+            tx, ty = pos_to_cell_int(bx, by)
+            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
         except Exception:
             pass
 
@@ -790,8 +794,8 @@ def handle_new_life(data: Dict[str, Any]):
         # Log vị trí spawn
         try:
             bx, by = bomber.get("x", 0), bomber.get("y", 0)
-            tx, ty = pos_to_cell_bot(bx, by)
-            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx+1},{ty+1})")
+            tx, ty = pos_to_cell_int(bx, by)
+            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
         except Exception:
             pass
     

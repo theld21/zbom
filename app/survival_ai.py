@@ -151,7 +151,9 @@ class SimpleSurvivalAI:
             return None
         
         # 1. Ưu tiên sinh tồn - tìm nơi an toàn (ưu tiên ô chưa thăm)
-        safe_goals = self._find_safe_areas(current_cell)
+        # Convert float to int for safe areas calculation
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
+        safe_goals = self._find_safe_areas(current_cell_int)
         if safe_goals:
             # Ưu tiên ô chưa thăm
             unexplored_safe = [goal for goal in safe_goals if goal not in self.visited_cells]
@@ -197,7 +199,16 @@ class SimpleSurvivalAI:
             if (int(plan_goal[0]) == int(current_cell[0]) and 
                 int(plan_goal[1]) == int(current_cell[1])):
                 if can_place_bomb and self._should_place_bomb_for_chest(current_cell, current_time, can_place_bomb):
+                    # Hiển thị plan chi tiết
+                    bomb_pos = plan_goal
+                    escape_pos = plan.get("escape_cell", "chưa tính")
+                    escape_path = plan.get("escape_path", [])
+                    
                     logger.info(f"💣 PLAN DÀI HẠN - ĐẶT BOM TẠI VỊ TRÍ HIỆN TẠI")
+                    logger.info(f"🎯 PLAN CHI TIẾT: ĐẾN {bomb_pos} → ĐẶT BOM → THOÁT ĐẾN {escape_pos}")
+                    if escape_path:
+                        logger.info(f"🛡️ ĐƯỜNG THOÁT: {escape_path}")
+                    
                     self.last_action_time = current_time
                     self.last_bomb_time_ms = current_time
                     self.current_plan = None
@@ -219,11 +230,54 @@ class SimpleSurvivalAI:
                         return fallback
                     return None
             else:
+                # Hiển thị plan chi tiết khi di chuyển
+                bomb_pos = plan_goal
+                escape_pos = plan.get("escape_cell", "chưa tính")
+                escape_path = plan.get("escape_path", [])
+                
                 logger.info(f"💣 PLAN DÀI HẠN - ĐẾN VỊ TRÍ ĐẶT BOM: {plan_goal}")
+                logger.info(f"🎯 PLAN CHI TIẾT: ĐẾN {bomb_pos} → ĐẶT BOM → THOÁT ĐẾN {escape_pos}")
+                if escape_path:
+                    logger.info(f"🛡️ ĐƯỜNG THOÁT: {escape_path}")
+                
                 self.last_action_time = current_time
                 self._update_last_direction(current_cell, plan_goal)
                 return {"type": "move", "goal_cell": plan_goal}
         return None
+    
+    def _calculate_escape_plan(self, bomb_position: Tuple[int, int], current_cell: Tuple[int, int]) -> Dict[str, Any]:
+        """Tính escape plan cho bomb position"""
+        try:
+            from .strategies.helpers.escape_planner import EscapePlanner
+            
+            # Tính escape path từ bomb position
+            escape_result = EscapePlanner.find_escape_path_from_bomb(
+                bomb_position=bomb_position,
+                bot_position=current_cell,
+                explosion_range=2,  # Default explosion range
+                bomb_lifetime=5000.0
+            )
+            
+            if escape_result:
+                escape_path, escape_time = escape_result
+                return {
+                    "escape_cell": escape_path[-1] if escape_path else None,
+                    "escape_path": escape_path,
+                    "escape_time": escape_time
+                }
+            else:
+                return {
+                    "escape_cell": None,
+                    "escape_path": [],
+                    "escape_time": 0
+                }
+        except Exception as e:
+            logger.warning(f"⚠️ LỖI TÍNH ESCAPE PLAN: {e}")
+            return {
+                "escape_cell": None,
+                "escape_path": [],
+                "escape_time": 0
+            }
     
     def _get_fallback_action(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Dict[str, Any]]:
         """Xử lý tất cả fallback strategies"""
@@ -1533,11 +1587,17 @@ class SimpleSurvivalAI:
             # 2. TÌM VỊ TRÍ ĐẶT BOM GẦN RƯƠNG
             bomb_position = self._find_bomb_position_near_chest(current_cell, current_time)
             if bomb_position:
+                # Tính escape path cho plan bomb_chest
+                escape_info = self._calculate_escape_plan(bomb_position, current_cell)
+                
                 return {
                     "type": "bomb_chest", 
                     "goal_cell": bomb_position,
                     "action": "bomb" if bomb_position == current_cell else "move",
-                    "reason": "Đặt bom nổ rương"
+                    "reason": "Đặt bom nổ rương",
+                    "escape_cell": escape_info.get("escape_cell"),
+                    "escape_path": escape_info.get("escape_path", []),
+                    "escape_time": escape_info.get("escape_time", 0)
                 }
             
             # 3. CHIẾN LƯỢC DÀI HẠN

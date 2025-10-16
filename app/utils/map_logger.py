@@ -108,9 +108,10 @@ def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True, force: b
             map_lines.append(line)
         
         # Log map
-        logger.info("🗺️ BẢN ĐỒ HIỆN TẠI (khu vực bên trong):")
+        logger.info("🗺️ BẢN ĐỒ HIỆN TẠI:")
+        logger.info("🗺️  0|0123456789012345")
         for i, line in enumerate(map_lines):
-            logger.info(f"🗺️ {i+1:2d}|{line}")
+            logger.info(f"🗺️ {i:2d}|{line}")
         
         logger.info("🗺️ CHÚ THÍCH: x=tường, r=rương, X=bot, b=bomb, g=giày, c=item bom, l=lửa, -=trống")
         

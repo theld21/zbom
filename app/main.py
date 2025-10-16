@@ -251,10 +251,10 @@ async def send_bomb():
     
     # Kiểm tra bot có thể di chuyển không
     me = get_my_bomber()
-    if me and not me.get("movable", True):
-        logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Bot không thể di chuyển")
-        logger.warning(f"🔍 ME DETAILS: {me}")
-        return
+    # if me and not me.get("movable", True):
+    #     logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Bot không thể di chuyển")
+    #     logger.warning(f"🔍 ME DETAILS: {me}")
+    #     return
     
     # Kiểm tra game đã bắt đầu chưa
     if not game_state.get("game_started", False):
@@ -403,6 +403,12 @@ async def bot_loop():
                     target_cell = movement_plan["need_bomb_at_target"]
                     logger.info(f"💣 ĐẶT BOM NGAY TẠI: {target_cell}")
                     await send_bomb()
+                    
+                    # Set flag để survival_ai biết phải thoát ngay
+                    from .survival_ai import survival_ai
+                    survival_ai.must_escape_bomb = True
+                    logger.warning(f"⚡ SET FLAG: must_escape_bomb = True (main.py)")
+                    
                     movement_plan.pop("need_bomb_at_target", None)
                     did_progress = True
                 
@@ -456,6 +462,12 @@ async def bot_loop():
                             did_progress = True
                         elif action["type"] == "bomb":
                             await send_bomb()
+                            
+                            # Set flag để survival_ai biết phải thoát ngay
+                            from .survival_ai import survival_ai
+                            survival_ai.must_escape_bomb = True
+                            logger.warning(f"⚡ SET FLAG: must_escape_bomb = True (survival_ai)")
+                            
                             did_progress = True
                         else:
                             direction = action["orient"]
