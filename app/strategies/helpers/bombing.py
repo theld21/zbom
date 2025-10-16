@@ -88,17 +88,26 @@ class BombingHelper:
     
     @staticmethod
     def find_chests_in_range(current_cell: Tuple[int, int], max_range: int) -> List[Tuple[int, int]]:
-        """Tìm rương trong tầm"""
+        """Tìm rương trong tầm (hoặc toàn bộ map nếu max_range >= 16)"""
         from ...game_state import game_state, pos_to_cell
         
         chests = []
         try:
             chest_data = game_state.get("chests", [])
+            logger.debug(f"🔍 TÌM RƯƠNG: Có {len(chest_data)} rương, max_range={max_range}")
+            
             for chest in chest_data:
                 chest_cell = pos_to_cell(chest.get("x", 0), chest.get("y", 0))
-                distance = abs(chest_cell[0] - current_cell[0]) + abs(chest_cell[1] - current_cell[1])
-                if distance <= max_range:
+                # Nếu max_range >= 16, tìm toàn bộ map
+                if max_range >= 16:
                     chests.append(chest_cell)
-        except:
-            pass
+                else:
+                    # Manhattan distance
+                    distance = abs(chest_cell[0] - current_cell[0]) + abs(chest_cell[1] - current_cell[1])
+                    if distance <= max_range:
+                        chests.append(chest_cell)
+            
+            logger.debug(f"🔍 TÌM RƯƠNG: Tìm thấy {len(chests)} rương trong tầm")
+        except Exception as e:
+            logger.error(f"❌ Lỗi tìm rương: {e}")
         return chests

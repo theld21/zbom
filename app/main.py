@@ -253,6 +253,7 @@ async def send_bomb():
     me = get_my_bomber()
     if me and not me.get("movable", True):
         logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Bot không thể di chuyển")
+        logger.warning(f"🔍 ME DETAILS: {me}")
         return
     
     # Kiểm tra game đã bắt đầu chưa
@@ -309,6 +310,9 @@ async def bot_loop():
             if not me:
                 available_bombers = [b.get('name') for b in game_state.get('bombers', [])]
                 logger.warning(f"🤖 Không tìm thấy bot! Có sẵn: {available_bombers}")
+                logger.warning(f"🔍 GAME STATE: connected={game_state.get('connected')}, started={game_state.get('game_started')}")
+                logger.warning(f"🔍 BOMBERS: {game_state.get('bombers', [])}")
+                logger.warning(f"🔍 MY_UID: {game_state.get('my_uid')}")
                 
                 # Thử tìm lại bot nếu có bombers
                 if available_bombers:
@@ -326,7 +330,9 @@ async def bot_loop():
                         if uids:
                             game_state["my_uid"] = game_state["bombers"][0].get("uid")
                             logger.info(f"🤖 CHỌN LẠI BOT (FALLBACK): {game_state['bombers'][0].get('name')} ({game_state['my_uid']})")
-                    me = get_my_bomber()  # Thử lấy lại
+                        else:
+                            logger.warning(f"🚫 KHÔNG TÌM THẤY BOT: Có sẵn: {[b.get('name') for b in game_state.get('bombers', [])]}")
+                        me = get_my_bomber()  # Thử lấy lại
             
             # Kiểm tra game có hoạt động không
             game_active = game_state["connected"] and (game_state["game_started"] or os.getenv("ENVIRONMENT", "prod") == "dev")
@@ -338,9 +344,11 @@ async def bot_loop():
                 logger.info(f"🗺️ CHỜ MAP: Map chưa sẵn sàng sau khi hồi sinh, tạm dừng AI")
             
             if game_active and me and map_ready:
+                # Log chi tiết bot info
+                logger.debug(f"🤖 BOT INFO: {me}")
                 # Kiểm tra vị trí bot có hợp lệ không
                 current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
-                if not (1 <= current_cell[0] <= 14 and 1 <= current_cell[1] <= 14):
+                if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
                     logger.warning(f"🚫 BOT Ở VỊ TRÍ KHÔNG HỢP LỆ: {current_cell} - Tạm dừng AI")
                     await asyncio.sleep(period)
                     continue
@@ -376,10 +384,27 @@ async def bot_loop():
                 if movement_plan.get("just_completed"):
                     completed_time = movement_plan["just_completed"]
                     if time.time() - completed_time < 1.0:
+                        # Đặt bom ngay khi path hoàn thành (chỉ 1 lần)
+                        if not movement_plan.get("bomb_placed"):
+                            me = get_my_bomber()
+                            if me:
+                                current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
+                                logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell}")
+                                await send_bomb()
+                                movement_plan["bomb_placed"] = True
                         await asyncio.sleep(period)
                         continue
                     else:
                         movement_plan.pop("just_completed", None)
+                        movement_plan.pop("bomb_placed", None)
+                
+                # Đặt bom ngay khi đến đích (trước khi chạy tiếp)
+                if movement_plan.get("need_bomb_at_target"):
+                    target_cell = movement_plan["need_bomb_at_target"]
+                    logger.info(f"💣 ĐẶT BOM NGAY TẠI: {target_cell}")
+                    await send_bomb()
+                    movement_plan.pop("need_bomb_at_target", None)
+                    did_progress = True
                 
                 # Tiếp tục plan dài hạn
                 if movement_plan["path_valid"] and movement_plan["path"]:

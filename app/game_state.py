@@ -135,8 +135,8 @@ def is_at_exact_cell(x: float, y: float) -> bool:
     """Kiểm tra bot có đang ở chính xác cell không (số nguyên)"""
     cell_x, cell_y = pos_to_cell(x, y)
     return (
-        isinstance(cell_x, int) or cell_x.is_integer() and
-        isinstance(cell_y, int) or cell_y.is_integer()
+        (isinstance(cell_x, int) or (isinstance(cell_x, float) and cell_x.is_integer())) and
+        (isinstance(cell_y, int) or (isinstance(cell_y, float) and cell_y.is_integer()))
     )
 
 def cell_to_pos(cx: int, cy: int) -> Tuple[int, int]:
@@ -148,8 +148,8 @@ def cell_top_left_pos(cx: int, cy: int) -> Tuple[int, int]:
     return (cx * CELL_SIZE, cy * CELL_SIZE)
 
 def in_bounds(cx: int, cy: int) -> bool:
-    """Kiểm tra tọa độ ô có trong map không (1-14)"""
-    return 1 <= cx <= 14 and 1 <= cy <= 14
+    """Kiểm tra tọa độ ô có trong map không (0-15)"""
+    return 0 <= cx <= 15 and 0 <= cy <= 15
 
 def in_pixel_bounds(x: float, y: float) -> bool:
     """Kiểm tra vị trí pixel có trong map không"""
@@ -429,7 +429,7 @@ class FastGameState:
         # bots
         for ag in self.agents.values():
             if ag.alive and self.static.in_bounds(ag.pos[0], ag.pos[1]):
-                x, y = ag.pos
+                x, y = int(ag.pos[0]), int(ag.pos[1])  # Convert float to int
                 mask[y, x] |= BOT_MASK
         self._cached_tile_mask = mask
         self._cached_mask_tick = self.tick
@@ -697,7 +697,10 @@ def bfs_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_bo
     if not (fs.static.in_bounds(start[0], start[1]) and fs.static.in_bounds(goal[0], goal[1])):
         return None
     walkable = fs.walkable_mask(avoid_hazard=avoid_hazard, avoid_bots=avoid_bots, avoid_bombs=avoid_bombs)
-    if not walkable[start[1], start[0]] or not walkable[goal[1], goal[0]]:
+    # Convert to int for numpy array indexing
+    start_y, start_x = int(start[1]), int(start[0])
+    goal_y, goal_x = int(goal[1]), int(goal[0])
+    if not walkable[start_y, start_x] or not walkable[goal_y, goal_x]:
         return None
     # Cache theo tick
     cache_key = (start, goal, bool(avoid_hazard), bool(avoid_bots), bool(avoid_bombs), "bfs")
@@ -725,7 +728,7 @@ def bfs_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_bo
             invalid_path = False
             for i, (px, py) in enumerate(path):
                 if 0 <= px < W and 0 <= py < H:
-                    is_walkable = walkable[py, px]
+                    is_walkable = walkable[int(py), int(px)]
                     if not is_walkable:
                         logger.warning(f"⚠️ PATH INVALID: ({px},{py}) không thể đi được!")
                         invalid_path = True
@@ -739,7 +742,7 @@ def bfs_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_bo
             return path
         for dx, dy in NEIGHBORS:
             nx, ny = x + dx, y + dy
-            if 0 <= nx < W and 0 <= ny < H and not visited[ny, nx] and walkable[ny, nx]:
+            if 0 <= nx < W and 0 <= ny < H and not visited[ny, nx] and walkable[int(ny), int(nx)]:
                 visited[ny, nx] = True
                 parent[(nx, ny)] = (x, y)
                 q.append((nx, ny))
@@ -762,7 +765,10 @@ def astar_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_
     if not (fs.static.in_bounds(start[0], start[1]) and fs.static.in_bounds(goal[0], goal[1])):
         return None
     walkable = fs.walkable_mask(avoid_hazard=avoid_hazard, avoid_bots=avoid_bots, avoid_bombs=avoid_bombs)
-    if not walkable[start[1], start[0]] or not walkable[goal[1], goal[0]]:
+    # Convert to int for numpy array indexing
+    start_y, start_x = int(start[1]), int(start[0])
+    goal_y, goal_x = int(goal[1]), int(goal[0])
+    if not walkable[start_y, start_x] or not walkable[goal_y, goal_x]:
         return None
 
     # Cache theo tick
@@ -802,7 +808,7 @@ def astar_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_
             invalid_path = False
             for i, (px, py) in enumerate(path):
                 if 0 <= px < W and 0 <= py < H:
-                    is_walkable = walkable[py, px]
+                    is_walkable = walkable[int(py), int(px)]
                     if not is_walkable:
                         logger.warning(f"⚠️ A* PATH INVALID: ({px},{py}) không thể đi được!")
                         invalid_path = True
@@ -817,7 +823,7 @@ def astar_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_
         x, y = current
         for dx, dy in NEIGHBORS:
             nx, ny = x + dx, y + dy
-            if 0 <= nx < W and 0 <= ny < H and walkable[ny, nx]:
+            if 0 <= nx < W and 0 <= ny < H and walkable[int(ny), int(nx)]:
                 neighbor = (nx, ny)
                 tentative_g = g_score[current] + 1
                 if tentative_g < g_score.get(neighbor, 1_000_000_000):

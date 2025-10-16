@@ -128,7 +128,7 @@ class SimpleSurvivalAI:
                 if dx == 0 and dy == 0:
                     continue
                 target = (current_cell[0] + dx, current_cell[1] + dy)
-                if (1 <= target[0] <= 14 and 1 <= target[1] <= 14 and 
+                if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                     target not in self.visited_cells and 
                     self._is_cell_passable(target)):
                     targets.append(target)
@@ -137,14 +137,14 @@ class SimpleSurvivalAI:
     def _get_strategic_goal(self, current_cell: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         """Lập kế hoạch chiến lược thông minh - TRÁNH VÒNG LẶP"""
         # Kiểm tra vị trí hiện tại có hợp lệ không
-        if not (1 <= current_cell[0] <= 14 and 1 <= current_cell[1] <= 14):
+        if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
             logger.warning(f"🚫 VỊ TRÍ KHÔNG HỢP LỆ: {current_cell} - Tìm vị trí an toàn gần nhất")
             # Tìm vị trí an toàn gần nhất trong map
             for radius in range(1, 8):
                 for dx in range(-radius, radius + 1):
                     for dy in range(-radius, radius + 1):
                         target = (current_cell[0] + dx, current_cell[1] + dy)
-                        if (1 <= target[0] <= 14 and 1 <= target[1] <= 14 and 
+                        if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                             self._is_cell_passable(target)):
                             logger.info(f"🎯 TÌM THẤY VỊ TRÍ AN TOÀN: {target}")
                             return target
@@ -193,7 +193,9 @@ class SimpleSurvivalAI:
             self._update_last_direction(current_cell, plan_goal)
             return {"type": "move", "goal_cell": plan_goal}
         elif plan_type == "bomb_chest":
-            if plan_goal == current_cell:
+            # So sánh int với float: (14, 4) == (14.0, 4.0)
+            if (int(plan_goal[0]) == int(current_cell[0]) and 
+                int(plan_goal[1]) == int(current_cell[1])):
                 if can_place_bomb and self._should_place_bomb_for_chest(current_cell, current_time, can_place_bomb):
                     logger.info(f"💣 PLAN DÀI HẠN - ĐẶT BOM TẠI VỊ TRÍ HIỆN TẠI")
                     self.last_action_time = current_time
@@ -226,7 +228,7 @@ class SimpleSurvivalAI:
     def _get_fallback_action(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Dict[str, Any]]:
         """Xử lý tất cả fallback strategies"""
         # Kiểm tra vị trí hiện tại có hợp lệ không
-        if not (1 <= current_cell[0] <= 14 and 1 <= current_cell[1] <= 14):
+        if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
             logger.warning(f"🚫 FALLBACK: Vị trí không hợp lệ {current_cell}")
             return None
         
@@ -326,7 +328,7 @@ class SimpleSurvivalAI:
                 if dx == 0 and dy == 0:
                     continue
                 target = (current_cell[0] + dx, current_cell[1] + dy)
-                if (1 <= target[0] <= 14 and 1 <= target[1] <= 14 and 
+                if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                     self._is_cell_passable(target) and 
                     not self._is_in_danger(target, time.time() * 1000)):
                     safe_areas.append(target)
@@ -338,7 +340,7 @@ class SimpleSurvivalAI:
         try:
             item_tile_map = game_state.get("item_tile_map", {})
             for (x, y), item_type in item_tile_map.items():
-                if (1 <= x <= 14 and 1 <= y <= 14 and 
+                if (0 <= x <= 15 and 0 <= y <= 15 and 
                     item_type in ["SPEED", "EXPLOSION_RANGE", "BOMB_COUNT"]):
                     distance = abs(x - current_cell[0]) + abs(y - current_cell[1])
                     if distance <= 5:
@@ -370,7 +372,7 @@ class SimpleSurvivalAI:
             return None
         
         # Kiểm tra vị trí hiện tại có hợp lệ không
-        if not (1 <= current_cell[0] <= 14 and 1 <= current_cell[1] <= 14):
+        if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
             logger.warning(f"🚫 VỊ TRÍ BOT KHÔNG HỢP LỆ: {current_cell} - Bỏ qua AI")
             return None
         
@@ -491,8 +493,12 @@ class SimpleSurvivalAI:
         
     def _update_last_direction(self, from_cell: Tuple[int, int], to_cell: Tuple[int, int]) -> None:
         """Cập nhật hướng di chuyển cuối cùng để tránh oscillation"""
-        dx = to_cell[0] - from_cell[0]
-        dy = to_cell[1] - from_cell[1]
+        # Xử lý float: (14.0, 4.0) -> (14, 4)
+        from_cell_int = (int(from_cell[0]), int(from_cell[1]))
+        to_cell_int = (int(to_cell[0]), int(to_cell[1]))
+        
+        dx = to_cell_int[0] - from_cell_int[0]
+        dy = to_cell_int[1] - from_cell_int[1]
         
         if dx > 0:
             direction = "RIGHT"
@@ -908,6 +914,8 @@ class SimpleSurvivalAI:
         # Thêm dự báo 1 bước nhỏ nếu đang xét tương lai gần
         # delta_ms không dùng ở đây để tránh lệch lớn
         cx, cy = cell
+        # Convert float to int for numpy array indexing
+        cx, cy = int(cx), int(cy)
         if not fs.static.in_bounds(cx, cy):
             return True
         return fs.dynamic.hazard_until[cy, cx] > now_tick
@@ -934,6 +942,8 @@ class SimpleSurvivalAI:
         if not fs.static:
             return False
         cx, cy = cell
+        # Convert float to int for numpy array indexing
+        cx, cy = int(cx), int(cy)
         if not fs.static.in_bounds(cx, cy):
             return False
         walkable = fs.walkable_mask(avoid_hazard=False)
@@ -984,7 +994,7 @@ class SimpleSurvivalAI:
                     if dx == 0 and dy == 0:
                         continue
                     target = (cell[0] + dx, cell[1] + dy)
-                    if (1 <= target[0] <= 14 and 1 <= target[1] <= 14 and
+                    if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                         target != cell and 
                         self._is_cell_passable(target) and 
                         not self._is_in_danger(target, current_time + 2000)):
@@ -1189,7 +1199,7 @@ class SimpleSurvivalAI:
             # QUAN TRỌNG: Truyền blacklist để tránh chọn vị trí đã fail
             best_position = AdvancedBombingStrategy.find_best_bombing_position(
                 current_cell, 
-                max_search_radius=6,
+                max_search_radius=16,
                 blacklist=self.failed_bomb_positions,
                 current_time=current_time
             )

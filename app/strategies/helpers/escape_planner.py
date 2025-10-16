@@ -125,7 +125,7 @@ class EscapePlanner:
                 ny = bomb_position[1] + dy * distance
                 
                 # Kiểm tra bounds
-                if not (1 <= nx <= 14 and 1 <= ny <= 14):
+                if not (0 <= nx <= 15 and 0 <= ny <= 15):
                     break
                 
                 blast_zone.add((nx, ny))
@@ -171,7 +171,7 @@ class EscapePlanner:
                     
                     # Kiểm tra cell ngoài blast zone và có thể đi qua
                     if (cell not in blast_zone and
-                        1 <= cell[0] <= 14 and 1 <= cell[1] <= 14 and
+                        0 <= cell[0] <= 15 and 0 <= cell[1] <= 15 and
                         NavigationHelper.is_cell_passable(cell)):
                         safe_cells.append(cell)
             

@@ -202,10 +202,11 @@ class MovementPlanner:
         
         from ..game_state import is_at_exact_cell
         
+        # Check if bot has arrived at the exact target cell
         arrived = (
             is_at_exact_cell(curx, cury) and
-            int(actual_current_cell[0]) == target_cell[0] and
-            int(actual_current_cell[1]) == target_cell[1]
+            actual_current_cell[0] == target_cell[0] and
+            actual_current_cell[1] == target_cell[1]
         )
         
         # Tính remaining pixels
@@ -229,6 +230,13 @@ class MovementPlanner:
             self.reverse_block_until = current_time + reverse_lock_seconds
             self.recent_orient = direction
             self.plan["orient"] = None
+            
+            # Đặt flag để main.py đặt bom ngay
+            if not self.plan.get("bomb_placed_at_target"):
+                logger.info(f"💣 ĐẾN ĐÍCH - CẦN ĐẶT BOM TẠI: {target_cell}")
+                self.plan["bomb_placed_at_target"] = True
+                self.plan["need_bomb_at_target"] = target_cell
+            
             return
         else:
             self.plan["orient"] = direction

@@ -2,12 +2,13 @@
 Utility modules
 """
 
-from .logger import MovementLogger, log_map_state
-from .movement import MovementPlanner, reset_movement_plan
+from .movement_logger import MovementLogger
+from .map_logger import log_map_state
+from .movement_planner import MovementPlanner, get_movement_planner
 
 __all__ = [
     "MovementLogger",
     "log_map_state",
     "MovementPlanner",
-    "reset_movement_plan",
+    "get_movement_planner",
 ]

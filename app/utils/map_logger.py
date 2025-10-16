@@ -37,12 +37,12 @@ def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True, force: b
         if me:
             bot_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
         
-        # Tạo map 14x14 (bỏ hàng/cột biên)
+        # Tạo map 16x16 (hiển thị toàn bộ)
         map_lines = []
         
-        for y in range(1, 15):  # Hàng 1-14
+        for y in range(0, 16):  # Hàng 0-15
             line = ""
-            for x in range(1, 15):  # Cột 1-14
+            for x in range(0, 16):  # Cột 0-15
                 # Kiểm tra bot
                 if bot_cell and bot_cell == (x, y):
                     line += "X"

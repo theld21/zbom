@@ -289,17 +289,17 @@ def handle_new_bomb(data: Dict[str, Any]):
         created_at = data.get("createdAt", time.time() * 1000)
         lifetime = data.get("lifeTime", 5000.0)
         
-        # Add vào tracker (1-indexed position)
+        # Add vào tracker (0-indexed position - map 16x16)
         bomb_tracker.add_bomb(
             bomb_id=bomb_id,
-            position=(tile_x + 1, tile_y + 1),
+            position=(tile_x, tile_y),
             explosion_range=explosion_range,
             created_at=created_at,
             lifetime=lifetime,
             owner_uid=bomb_uid
         )
         
-        logger.info(f"🎯 BOMB TRACKER: Đã track bom {bomb_id} tại ({tile_x+1}, {tile_y+1}), tầm nổ={explosion_range}")
+        logger.info(f"🎯 BOMB TRACKER: Đã track bom {bomb_id} tại ({tile_x}, {tile_y}), tầm nổ={explosion_range}")
         
     except Exception as e:
         logger.exception(f"Bomb tracker add error: {e}")
@@ -763,9 +763,10 @@ def handle_new_life(data: Dict[str, Any]):
                 survival_ai.reset_state()
                 logger.info(f"🔄 RESET AI STATE: Đã reset toàn bộ AI state")
             
-            # Reset movement plan trong main.py
-            from .main import _reset_movement_plan
-            _reset_movement_plan()
+            # Reset movement plan trong movement_planner.py
+            from .utils.movement_planner import get_movement_planner
+            movement_planner = get_movement_planner()
+            movement_planner.reset()
             logger.info(f"🔄 RESET MOVEMENT PLAN: Đã reset movement plan sau khi hồi sinh")
         except Exception as e:
             logger.exception(f"Reset AI state error: {e}")

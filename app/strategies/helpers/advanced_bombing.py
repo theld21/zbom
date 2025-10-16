@@ -21,7 +21,7 @@ class AdvancedBombingStrategy:
     @staticmethod
     def find_best_bombing_position(
         current_position: Tuple[int, int],
-        max_search_radius: int = 10,
+        max_search_radius: int = 16,  # Tìm toàn bộ map 16x16
         blacklist: Optional[Dict[Tuple[int, int], float]] = None,
         current_time: float = 0.0
     ) -> Optional[Tuple[int, int]]:
@@ -49,8 +49,10 @@ class AdvancedBombingStrategy:
         chests = BombingHelper.find_chests_in_range(current_position, max_search_radius)
         
         if not chests:
-            logger.info("🔍 KHÔNG CÓ RƯƠNG trong tầm tìm kiếm")
+            logger.info(f"🔍 KHÔNG CÓ RƯƠNG trong tầm tìm kiếm (max_range={max_search_radius})")
             return None
+        
+        logger.debug(f"🔍 TÌM THẤY {len(chests)} RƯƠNG: {chests[:5]}...")  # Log 5 rương đầu
         
         # Đánh giá từng vị trí có thể đặt bom
         candidates = []
@@ -133,7 +135,7 @@ class AdvancedBombingStrategy:
                 bomb_pos = (target[0] - dx * distance, target[1] - dy * distance)
                 
                 # Kiểm tra bounds
-                if not (1 <= bomb_pos[0] <= 14 and 1 <= bomb_pos[1] <= 14):
+                if not (0 <= bomb_pos[0] <= 15 and 0 <= bomb_pos[1] <= 15):
                     break
                 
                 # Kiểm tra không có tường giữa bomb và target
@@ -141,9 +143,11 @@ class AdvancedBombingStrategy:
                 for check_dist in range(1, distance + 1):
                     check_pos = (target[0] - dx * check_dist, target[1] - dy * check_dist)
                     try:
-                        if (check_pos[1] < len(map_data) and 
-                            check_pos[0] < len(map_data[check_pos[1]])):
-                            cell_value = map_data[check_pos[1]][check_pos[0]]
+                        # Convert to int for array indexing
+                        check_y, check_x = int(check_pos[1]), int(check_pos[0])
+                        if (check_y < len(map_data) and 
+                            check_x < len(map_data[check_y])):
+                            cell_value = map_data[check_y][check_x]
                             if cell_value == 'W' or cell_value == 1:
                                 path_clear = False
                                 break
@@ -222,7 +226,7 @@ class AdvancedBombingStrategy:
                 check_pos = (bomb_position[0] + dx * distance, bomb_position[1] + dy * distance)
                 
                 # Kiểm tra bounds
-                if not (1 <= check_pos[0] <= 14 and 1 <= check_pos[1] <= 14):
+                if not (0 <= check_pos[0] <= 15 and 0 <= check_pos[1] <= 15):
                     break
                 
                 # Kiểm tra có chest không
@@ -233,9 +237,11 @@ class AdvancedBombingStrategy:
                 
                 # Dừng nếu gặp tường
                 try:
-                    if (check_pos[1] < len(map_data) and 
-                        check_pos[0] < len(map_data[check_pos[1]])):
-                        cell_value = map_data[check_pos[1]][check_pos[0]]
+                    # Convert to int for array indexing
+                    check_y, check_x = int(check_pos[1]), int(check_pos[0])
+                    if (check_y < len(map_data) and 
+                        check_x < len(map_data[check_y])):
+                        cell_value = map_data[check_y][check_x]
                         if cell_value == 'W' or cell_value == 1:
                             break
                 except:

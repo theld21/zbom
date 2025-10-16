@@ -139,8 +139,8 @@ class BombTracker:
                 nx = bomb_position[0] + dx * distance
                 ny = bomb_position[1] + dy * distance
                 
-                # Check bounds (1-14)
-                if not (1 <= nx <= 14 and 1 <= ny <= 14):
+                # Check bounds (0-15)
+                if not (0 <= nx <= 15 and 0 <= ny <= 15):
                     break
                 
                 # Add vào blast zone

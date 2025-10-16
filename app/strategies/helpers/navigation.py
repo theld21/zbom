@@ -67,7 +67,7 @@ class NavigationHelper:
                 if dx == 0 and dy == 0:
                     continue
                 target = (current_cell[0] + dx, current_cell[1] + dy)
-                if (1 <= target[0] <= 14 and 1 <= target[1] <= 14 and
+                if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                     NavigationHelper.is_cell_passable(target) and
                     not DangerDetector.is_in_danger(target, current_time + 2000)):
                     safe_cells.append(target)
