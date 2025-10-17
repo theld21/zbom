@@ -211,12 +211,14 @@ class SimpleSurvivalAI:
                     
                     self.last_action_time = current_time
                     self.last_bomb_time_ms = current_time
-                    self.current_plan = None
                     self.must_escape_bomb = True  # BẮT BUỘC thoát lần loop tiếp
                     
                     # BLACKLIST VỊ TRÍ ĐÃ ĐẶT BOM trong 8s để tránh quay lại ngay
                     self.failed_bomb_positions[current_cell] = current_time
                     logger.warning(f"⚡ SET FLAG: must_escape_bomb = True + BLACKLIST {current_cell} trong 8s")
+                    
+                    # Clear plan sau khi đặt bom
+                    self.current_plan = None
                     return {"type": "bomb"}
                 else:
                     logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM tại {current_cell}: blacklist 5s")
@@ -473,6 +475,10 @@ class SimpleSurvivalAI:
                     logger.warning(f"🏃 THOÁT KHẨN CẤP: {direction}")
                     self.last_action_time = current_time
                     return {"type": "move", "goal_cell": next_cell}
+            
+            # Nếu không thể thoát, clear plan để tạo plan mới
+            logger.warning(f"🚫 KHÔNG THỂ THOÁT: Clear plan và tạo plan mới")
+            self.current_plan = None
         
         # 1. KIỂM TRA AN TOÀN TUYỆT ĐỐI - Chạy khỏi bom
         in_danger = self._is_in_danger(current_cell, current_time)
@@ -486,9 +492,16 @@ class SimpleSurvivalAI:
             return None
         
         # 1.5. LẬP PLAN DÀI HẠN - Mục tiêu rõ ràng
-        long_term_plan = self._create_long_term_plan(current_cell, current_time)
-        if long_term_plan:
-            return self._execute_long_term_plan(long_term_plan, current_cell, current_time, can_place_bomb)
+        # CHỈ tạo plan mới khi chưa có plan hoặc plan đã hoàn thành
+        if not self.current_plan:
+            long_term_plan = self._create_long_term_plan(current_cell, current_time)
+            if long_term_plan:
+                self.current_plan = long_term_plan
+                return self._execute_long_term_plan(long_term_plan, current_cell, current_time, can_place_bomb)
+        else:
+            # Đang có plan cũ - tiếp tục thực hiện
+            logger.info(f"🔄 TIẾP TỤC PLAN CŨ: {self.current_plan.get('type')} → {self.current_plan.get('goal_cell')}")
+            return self._execute_long_term_plan(self.current_plan, current_cell, current_time, can_place_bomb)
         
         # 1.6. ƯU TIÊN ĐẶT BOM LIÊN TỤC - Sau khi bom nổ
         if self._should_continue_bombing(current_cell, current_time, can_place_bomb):
@@ -543,7 +556,11 @@ class SimpleSurvivalAI:
         #     return None
             
         # 5. FALLBACK STRATEGIES
-        return self._get_fallback_action(current_cell, current_time)
+        fallback_action = self._get_fallback_action(current_cell, current_time)
+        if fallback_action:
+            # Clear plan khi dùng fallback
+            self.current_plan = None
+        return fallback_action
         
     def _update_last_direction(self, from_cell: Tuple[int, int], to_cell: Tuple[int, int]) -> None:
         """Cập nhật hướng di chuyển cuối cùng để tránh oscillation"""

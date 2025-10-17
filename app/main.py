@@ -384,14 +384,20 @@ async def bot_loop():
                 if movement_plan.get("just_completed"):
                     completed_time = movement_plan["just_completed"]
                     if time.time() - completed_time < 1.0:
-                        # Đặt bom ngay khi path hoàn thành (chỉ 1 lần)
+                        # CHỈ đặt bom khi plan là bomb_chest, không đặt bom khi plan là collect_item
                         if not movement_plan.get("bomb_placed"):
-                            me = get_my_bomber()
-                            if me:
-                                current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
-                                logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell}")
-                                await send_bomb()
-                                movement_plan["bomb_placed"] = True
+                            from .survival_ai import survival_ai
+                            current_plan = survival_ai.current_plan
+                            
+                            if current_plan and current_plan.get("type") == "bomb_chest":
+                                me = get_my_bomber()
+                                if me:
+                                    current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
+                                    logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell}")
+                                    await send_bomb()
+                                    movement_plan["bomb_placed"] = True
+                            else:
+                                logger.info(f"✅ PATH HOÀN THÀNH - KHÔNG ĐẶT BOM: Plan type = {current_plan.get('type') if current_plan else 'None'}")
                         await asyncio.sleep(period)
                         continue
                     else:
@@ -409,7 +415,10 @@ async def bot_loop():
                     survival_ai.must_escape_bomb = True
                     logger.warning(f"⚡ SET FLAG: must_escape_bomb = True (main.py)")
                     
+                    # KHÔNG clear plan ngay lập tức - để bot tiếp tục thực hiện escape path
                     movement_plan.pop("need_bomb_at_target", None)
+                    movement_plan["bomb_placed"] = True  # Đánh dấu đã đặt bom
+                    logger.info(f"🔄 TIẾP TỤC ESCAPE PATH: Không clear plan, tiếp tục thực hiện escape")
                     did_progress = True
                 
                 # Tiếp tục plan dài hạn
@@ -423,10 +432,32 @@ async def bot_loop():
                             await _maybe_emit_move(current_orient)
                             _stuck_count = 0
                             did_progress = True
+                        
+                        # Kiểm tra nếu plan đã hoàn thành
+                        if not movement_plan["path_valid"] or not movement_plan["path"]:
+                            # CHỈ clear plan khi thực sự hoàn thành (không phải khi vừa đặt bom)
+                            if not movement_plan.get("bomb_placed"):
+                                # Clear plan trong AI khi hoàn thành
+                                from .survival_ai import survival_ai
+                                survival_ai.current_plan = None
+                                logger.info(f"✅ CLEAR PLAN: Đã hoàn thành plan dài hạn")
+                            else:
+                                # Đã đặt bom nhưng chưa hoàn thành escape path
+                                logger.info(f"🔄 ESCAPE MODE: Đã đặt bom, tiếp tục thực hiện escape path")
                 else:
+                    # Kiểm tra nếu vừa hoàn thành plan (trong vòng 1 giây)
+                    if movement_plan.get("just_completed"):
+                        completed_time = movement_plan["just_completed"]
+                        if time.time() - completed_time < 1.0:  # 1 giây delay
+                            logger.info(f"⏳ DELAY SAU KHI HOÀN THÀNH PLAN: {time.time() - completed_time:.1f}s")
+                            did_progress = True
+                        else:
+                            # Hết delay, xóa flag và hỏi AI
+                            movement_plan.pop("just_completed", None)
                     
                     # Không có plan: hỏi AI
-                    action = choose_next_action()
+                    if not movement_plan.get("just_completed"):
+                        action = choose_next_action()
                     
                     if action is None:
                         global _last_ai_idle_time

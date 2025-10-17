@@ -221,42 +221,47 @@ class MovementPlanner:
         from ..game_state import is_at_exact_cell
         
         # Check if bot has arrived at the exact target cell
-        # Sử dụng pos_to_cell_int để consistency với get_next_direction
-        current_cell_int = pos_to_cell_int(curx, cury)
+        # Sử dụng pos_to_cell để chuyển đổi tọa độ pixel thành cell
+        from ..game_state import pos_to_cell
+        from ..config import CELL_SIZE
+        current_cell = pos_to_cell(curx, cury)
+        
+        # Bot đã đến khi:
+        # 1. Tọa độ cell là số nguyên (không phải .5)
+        # 2. Đúng ô mục tiêu
+        # 3. Cách mép trên cùng của target cell từ 0-5px (giống logic pos_to_cell)
         arrived = (
-            current_cell_int[0] == target_cell[0] and
-            current_cell_int[1] == target_cell[1]
+            (current_cell[0] % 1.0 == 0.0 and current_cell[1] % 1.0 == 0.0) and
+            (int(current_cell[0]) == target_cell[0] and int(current_cell[1]) == target_cell[1]) and
+            (curx % CELL_SIZE <= 5 and cury % CELL_SIZE <= 5)
         )
         
         from ..config import LOG_ARRIVAL_CHECK
         if LOG_ARRIVAL_CHECK:
-            logger.info(f"🔍 ARRIVAL CHECK: bot({curx:.1f},{cury:.1f}) → cell{current_cell_int} vs target{target_cell} = {arrived}")
+            logger.info(f"🔍 ARRIVAL CHECK: bot({curx:.1f},{cury:.1f}) → cell{current_cell} vs target{target_cell} = {arrived}")
         
         if arrived:
-            logger.info(f"✅ ĐẾN Ô: pixel({curx:.1f},{cury:.1f}) tile{current_cell_int} = target{target_cell}")
+            logger.info(f"✅ ĐẾN Ô: pixel({curx:.1f},{cury:.1f}) tile{current_cell} = target{target_cell}")
             self.plan["current_target_index"] += 1
             self.reverse_block_until = current_time + reverse_lock_seconds
             self.recent_orient = direction
             self.plan["orient"] = None
             
-            # Check nếu đã hết path
+            # Lưu ô hiện tại để kiểm tra đảo chiều
+            from ..game_state import pos_to_cell_int
+            self.plan["last_reverse_cell"] = pos_to_cell_int(curx, cury)
+            
+            # Check nếu đã hết path - CHỈ HOÀN THÀNH KHI ĐẾN Ô CUỐI CÙNG
             if self.plan["current_target_index"] >= len(self.plan["path"]):
                 logger.info(f"✅ HOÀN THÀNH: đã đến {self.plan['long_term_goal']}")
                 self.reset()
                 # Set delay 1s cho AI
                 self.plan["just_completed"] = time.time()
                 return
-            
-            # CHỈ đặt bom khi đến ô cuối cùng của path
-            if self.plan["current_target_index"] >= len(self.plan["path"]):
-                # Đã đến ô cuối cùng - đặt bom
-                if not self.plan.get("bomb_placed_at_target"):
-                    logger.info(f"💣 ĐẾN ĐÍCH CUỐI CÙNG - CẦN ĐẶT BOM TẠI: {target_cell}")
-                    self.plan["bomb_placed_at_target"] = True
-                    self.plan["need_bomb_at_target"] = target_cell
             else:
-                # Chưa đến ô cuối cùng - tiếp tục đi
-                logger.info(f"📍 ĐẾN Ô TRUNG GIAN: {target_cell}, tiếp tục đến ô tiếp theo")
+                # Chưa đến ô cuối cùng - tiếp tục đi đến ô tiếp theo
+                next_target = self.plan["path"][self.plan["current_target_index"]]
+                logger.info(f"📍 ĐẾN Ô TRUNG GIAN: {target_cell}, tiếp tục đến {next_target}")
             
             return
         else:
@@ -280,12 +285,20 @@ class MovementPlanner:
                 self.reset()
                 return
             
-            # Check reverse
+            # Check reverse - CHỈ chặn khi thực sự đảo chiều, không chặn khi tiếp tục plan
             if self.recent_orient and current_time < self.reverse_block_until:
                 reverse = {"UP":"DOWN","DOWN":"UP","LEFT":"RIGHT","RIGHT":"LEFT"}
                 if direction == reverse.get(self.recent_orient):
-                    logger.warning(f"🚫 CHỐNG ĐẢO CHIỀU: Bỏ qua hướng {direction}")
-                    return
+                    # CHỈ chặn nếu đang ở cùng một ô (thực sự đảo chiều)
+                    # Không chặn nếu đang di chuyển theo plan bình thường
+                    from ..game_state import pos_to_cell_int
+                    current_cell = pos_to_cell_int(curx, cury)
+                    if current_cell == self.plan.get("last_reverse_cell"):
+                        logger.warning(f"🚫 CHỐNG ĐẢO CHIỀU: Bỏ qua hướng {direction}")
+                        return
+                    else:
+                        # Đang di chuyển theo plan bình thường, không chặn
+                        logger.info(f"✅ TIẾP TỤC PLAN: {direction} từ {current_cell}")
         
         # Tính remaining pixels
         goal_center_x = target_cell[0] * cell_size + cell_size // 2
