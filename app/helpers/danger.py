@@ -14,7 +14,7 @@ class DangerDetector:
     @staticmethod
     def is_in_danger(cell: Tuple[int, int], current_time: float) -> bool:
         """Kiểm tra ô có nguy hiểm không"""
-        from ...game_state import get_fast_state
+        from ..game_state import get_fast_state
         
         fs = get_fast_state()
         if not fs.static:
@@ -29,7 +29,7 @@ class DangerDetector:
     @staticmethod
     def has_dangerous_bombs_nearby(cell: Tuple[int, int], current_time: float, radius: int = 3) -> bool:
         """Kiểm tra có bom nguy hiểm gần đó không"""
-        from ...game_state import game_state, pos_to_cell
+        from ..game_state import game_state, pos_to_cell
         
         try:
             bombs = game_state.get("bombs", [])

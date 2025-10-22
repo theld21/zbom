@@ -12,7 +12,6 @@ def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True, force: b
     try:
         # Import động để tránh circular import
         from ..game_state import get_my_bomber, pos_to_cell
-        from ..config import LOG_GAME_EVENTS
         
         # Lấy thông tin map
         map_data = game_state.get("map", [])
@@ -20,12 +19,6 @@ def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True, force: b
             tiles = map_data.get("tiles", [])
         else:
             tiles = map_data if isinstance(map_data, list) else []
-        
-        # DEBUG: Log cấu trúc dữ liệu map (chỉ khi cần debug)
-        if LOG_GAME_EVENTS:
-            logger.info(f"🗺️ DEBUG MAP: type={type(map_data)}, tiles_type={type(tiles)}")
-            if tiles and len(tiles) > 0:
-                logger.info(f"🗺️ DEBUG TILES: len={len(tiles)}")
         
         bombs = game_state.get("bombs", [])
         items = game_state.get("items", [])

@@ -10,12 +10,10 @@ from typing import Dict, Any
 from .game_state import (
     game_state, get_my_bomber, get_my_cell,
     fast_init_from_user, fast_handle_new_bomb, fast_handle_bomb_explode, fast_handle_map_update,
-    build_item_tile_map, build_chest_tile_map, pos_to_cell_bot, pos_to_cell, pos_to_cell_entity, pos_to_cell_int
+    build_item_tile_map, build_chest_tile_map
 )
 from .utils.map_logger import log_map_state
-from .config import CELL_SIZE, BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, LOG_BOMB_EVENTS
-
-# Sử dụng pos_to_cell từ game_state thay vì định nghĩa lại
+from .config import BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, LOG_BOMB_EVENTS
 
 logger = logging.getLogger("bot")
 
@@ -65,15 +63,12 @@ def handle_user(data: Dict[str, Any]):
     
     logger.info("🔄 RESET COMPLETE: Tất cả dữ liệu game đã được reset")
     
-    # Log response data quan trọng
     if LOG_GAME_EVENTS:
         logger.info(f"📥 USER RESPONSE: map={len(data.get('map', []))}x{len(data.get('map', [[]])[0]) if data.get('map') else 'empty'}")
         logger.info(f"📥 USER RESPONSE: bombers={len(data.get('bombers', []))}")
         logger.info(f"📥 USER RESPONSE: bombs={len(data.get('bombs', []))}")
         logger.info(f"📥 USER RESPONSE: items={len(data.get('items', []))}")
         logger.info(f"📥 USER RESPONSE: chests={len(data.get('chests', []))}")
-    
-    # Rút gọn log chi tiết để tránh noise
     
     # Cập nhật trạng thái thế giới
     game_state.update({
@@ -84,7 +79,6 @@ def handle_user(data: Dict[str, Any]):
         "chests": data.get("chests") or []
     })
     
-    # Log chi tiết bombers
     if LOG_GAME_EVENTS:
         for i, bomber in enumerate(game_state["bombers"]):
             logger.info(f"📥 BOMBER {i}: {bomber.get('name')} ({bomber.get('uid')}) - "
@@ -96,7 +90,6 @@ def handle_user(data: Dict[str, Any]):
     uids = [b.get("uid") for b in game_state["bombers"]]
     logger.info(f"🔍 TÌM BOT: my_uid={game_state['my_uid']} không có trong danh sách {uids}")
     
-    # Debug: Log tất cả bombers
     for i, b in enumerate(game_state["bombers"]):
         logger.info(f"🔍 BOMBER {i}: name='{b.get('name')}' uid='{b.get('uid')}'")
     
@@ -120,12 +113,10 @@ def handle_user(data: Dict[str, Any]):
     if is_start:
         game_state["game_started"] = True
     
-    # Log vị trí pixel và tile (16x16) khi user hiện ra
     try:
         for b in game_state.get("bombers", []):
             bx, by = b.get("x", 0), b.get("y", 0)
-            tx, ty = pos_to_cell_int(bx, by)
-            logger.info(f"SPAWN MAPPED: {b.get('name')} ({b.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
+            logger.info(f"SPAWN: {b.get('name')} ({b.get('uid')}) pixel=({bx},{by})")
     except Exception:
         pass
 
@@ -244,17 +235,15 @@ def handle_player_move(data: Dict[str, Any]):
     if uid == game_state.get("my_uid"):
         for bomb in game_state["bombs"]:
             if bomb.get("uid") == uid and not bomb.get("bomberPassedThrough", False):
-                bomb_cell = pos_to_cell_entity(bomb.get("x", 0), bomb.get("y", 0))
-                current_cell = pos_to_cell(data.get("x", 0), data.get("y", 0))
+                bomb_cell = (int(bomb.get("x", 0) // 40), int(bomb.get("y", 0) // 40))
+                current_cell = (int(data.get("x", 0) // 40), int(data.get("y", 0) // 40))
                 if bomb_cell != current_cell:
                     bomb["bomberPassedThrough"] = True
-                    # Đã đi qua bom
 
 def handle_new_bomb(data: Dict[str, Any]):
     """Xử lý đặt bom mới"""
     bomb_id = data.get("id")
     
-    # Log response data quan trọng
     if LOG_BOMB_EVENTS:
         logger.info(f"💣 BOM MỚI: id={bomb_id} owner={data.get('ownerName')} pos=({data.get('x')},{data.get('y')})")
     
@@ -271,7 +260,8 @@ def handle_new_bomb(data: Dict[str, Any]):
     
     # Cập nhật bomb_tile_map
     bomb_x, bomb_y = data.get("x", 0), data.get("y", 0)
-    tile_x, tile_y = pos_to_cell_entity(bomb_x, bomb_y)
+    tile_x = int(bomb_x // 40)
+    tile_y = int(bomb_y // 40)
     bomb_tile_map = game_state.get("bomb_tile_map", {})
     bomb_tile_map[(tile_x, tile_y)] = True
     game_state["bomb_tile_map"] = bomb_tile_map
@@ -331,7 +321,7 @@ def handle_new_bomb(data: Dict[str, Any]):
                 explosion_range = get_bomber_explosion_range(bomb_uid)
             
             # Tính blast zone (dùng logic đúng spec)
-            from .strategies.helpers.escape_planner import EscapePlanner
+            from .helpers.escape_planner import EscapePlanner
             blast_zone = EscapePlanner._calculate_blast_zone(
                 (tile_x + 1, tile_y + 1),  # Convert về 1-indexed
                 explosion_range
@@ -359,7 +349,6 @@ def handle_bomb_explode(data: Dict[str, Any]):
     bomb_id = data.get("id")
     explosion_area = data.get("explosionArea") or []
     
-    # Log response data quan trọng
     logger.info(f"💥 BOM NỔ: id={bomb_id} uid={data.get('uid')} areaPoints={len(explosion_area)}")
     
     # === XÓA KHỎI BOMB TRACKER ===
@@ -373,15 +362,15 @@ def handle_bomb_explode(data: Dict[str, Any]):
     
     # Phân tích phạm vi nổ thực tế
     if explosion_area:
-        # Chuyển đổi tọa độ pixel thành tile
         explosion_tiles = []
         for point in explosion_area:
             x, y = point.get("x", 0), point.get("y", 0)
-            tile_x, tile_y = pos_to_cell(x, y)
+            tile_x = int(x // 40)
+            tile_y = int(y // 40)
             explosion_tiles.append((tile_x, tile_y))
         
-        # Tính phạm vi nổ theo từng hướng
-        bomb_x, bomb_y = pos_to_cell(data.get("x", 0), data.get("y", 0))
+        bomb_x = int(data.get("x", 0) // 40)
+        bomb_y = int(data.get("y", 0) // 40)
         flame_ranges = {
             "UP": 0, "DOWN": 0, "LEFT": 0, "RIGHT": 0
         }
@@ -398,7 +387,6 @@ def handle_bomb_explode(data: Dict[str, Any]):
                 elif tile_x > bomb_x:  # Sang phải
                     flame_ranges["RIGHT"] = max(flame_ranges["RIGHT"], tile_x - bomb_x)
         
-        # Log phạm vi nổ thực tế
         logger.info(f"🔥 PHẠM VI NỔ THỰC TẾ: UP={flame_ranges['UP']}, DOWN={flame_ranges['DOWN']}, "
                    f"LEFT={flame_ranges['LEFT']}, RIGHT={flame_ranges['RIGHT']}")
         
@@ -435,7 +423,8 @@ def handle_bomb_explode(data: Dict[str, Any]):
     # Cập nhật bomb_tile_map - xóa bom đã nổ
     if exploded_bomb:
         bomb_x, bomb_y = exploded_bomb.get("x", 0), exploded_bomb.get("y", 0)
-        tile_x, tile_y = pos_to_cell_entity(bomb_x, bomb_y)
+        tile_x = int(bomb_x // 40)
+        tile_y = int(bomb_y // 40)
         bomb_tile_map = game_state.get("bomb_tile_map", {})
         if (tile_x, tile_y) in bomb_tile_map:
             del bomb_tile_map[(tile_x, tile_y)]
@@ -468,7 +457,6 @@ def handle_bomb_explode(data: Dict[str, Any]):
 
 def handle_map_update(data: Dict[str, Any]):
     """Xử lý cập nhật map (rương, items)"""
-    # Log response data quan trọng
     if LOG_GAME_EVENTS:
         logger.info(f"📥 MAP_UPDATE: chests={len(data.get('chests', []))} items={len(data.get('items', []))}")
     
@@ -552,7 +540,6 @@ def handle_map_update(data: Dict[str, Any]):
 
 def handle_item_collected(data: Dict[str, Any]):
     """Xử lý nhặt item"""
-    # Log response data quan trọng
     if LOG_ITEM_COLLECTION:
         logger.info(f"📥 ITEM_COLLECTED RESPONSE: {data}")
     
@@ -564,7 +551,8 @@ def handle_item_collected(data: Dict[str, Any]):
     # Cập nhật item_tile_map - xóa item đã được nhặt
     if item:
         item_x, item_y = item.get("x", 0), item.get("y", 0)
-        tile_x, tile_y = pos_to_cell_entity(item_x, item_y)
+        tile_x = int(item_x // 40)
+        tile_y = int(item_y // 40)
         
         # Xóa item khỏi bản đồ
         item_tile_map = game_state.get("item_tile_map", {})
@@ -586,7 +574,6 @@ def handle_item_collected(data: Dict[str, Any]):
 
 def handle_chest_destroyed(data: Dict[str, Any]):
     """Xử lý rương bị phá"""
-    # Log response data quan trọng
     logger.info(f"📥 CHEST_DESTROYED RESPONSE: {data}")
     logger.info(f"📦 RƯƠNG BỊ PHÁ: ({data.get('x')}, {data.get('y')}) - item={data.get('item')}")
     
@@ -594,7 +581,8 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     item = data.get("item")
     if item:
         item_x, item_y = item.get("x", 0), item.get("y", 0)
-        tile_x, tile_y = pos_to_cell_entity(item_x, item_y)
+        tile_x = int(item_x // 40)
+        tile_y = int(item_y // 40)
         item_type = item.get("type", "")
         
         # Thêm item vào bản đồ
@@ -605,7 +593,8 @@ def handle_chest_destroyed(data: Dict[str, Any]):
     
     # Cập nhật chest_tile_map - xóa rương đã bị phá
     chest_x, chest_y = data.get("x", 0), data.get("y", 0)
-    tile_x, tile_y = pos_to_cell_entity(chest_x, chest_y)
+    tile_x = int(chest_x // 40)
+    tile_y = int(chest_y // 40)
     chest_tile_map = game_state.get("chest_tile_map", {})
     if (tile_x, tile_y) in chest_tile_map:
         del chest_tile_map[(tile_x, tile_y)]
@@ -646,7 +635,6 @@ def handle_chest_destroyed(data: Dict[str, Any]):
 
 def handle_new_enemy(data: Dict[str, Any]):
     """Xử lý bot mới tham gia"""
-    # Log response data quan trọng
     logger.info(f"📥 NEW_ENEMY RESPONSE: {data}")
     
     bomber = data.get("bomber")
@@ -658,8 +646,7 @@ def handle_new_enemy(data: Dict[str, Any]):
                    f"speed={bomber.get('speed')} - alive={bomber.get('isAlive')}")
         try:
             bx, by = bomber.get("x", 0), bomber.get("y", 0)
-            tx, ty = pos_to_cell_int(bx, by)
-            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
+            logger.info(f"SPAWN: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by})")
         except Exception:
             pass
 
@@ -677,9 +664,6 @@ def handle_new_enemy(data: Dict[str, Any]):
 
 def handle_user_die_update(data: Dict[str, Any]):
     """Xử lý bot bị hạ gục"""
-    # Log response data quan trọng
-    # logger.info(f"📥 USER_DIE_UPDATE RESPONSE: {data}")
-    
     killer = data.get("killer")
     killed = data.get("killed")
     bomb = data.get("bomb")
@@ -697,9 +681,6 @@ def handle_user_die_update(data: Dict[str, Any]):
 
 def handle_user_disconnect(data: Dict[str, Any]):
     """Xử lý bot thoát khỏi phòng"""
-    # Log response data quan trọng
-    # logger.info(f"📥 USER_DISCONNECT RESPONSE: {data}")
-    
     uid = data.get("uid")
     bomber = data.get("bomber")
     
@@ -715,7 +696,6 @@ def handle_user_disconnect(data: Dict[str, Any]):
 
 def handle_new_life(data: Dict[str, Any]):
     """Xử lý bot hồi sinh (chỉ có ở môi trường luyện tập)"""
-    # Log response data quan trọng
     logger.info(f"📥 NEW_LIFE RESPONSE: {data.get('killed', {}).get('name')}")
     
     # Kiểm tra xem có phải bot của mình không
@@ -787,15 +767,12 @@ def handle_new_life(data: Dict[str, Any]):
         game_state["bombers"].append(bomber)
         logger.info(f"🔄 BOT HỒI SINH: {bomber.get('name')} ({bomber.get('uid')})")
         
-        # Update bomber data (đã reset ở trên nếu cần)
         if bomber.get("uid") == game_state.get("my_uid"):
             logger.info(f"✅ BOT CỦA MÌNH đã hồi sinh và được thêm vào game_state")
         
-        # Log vị trí spawn
         try:
             bx, by = bomber.get("x", 0), bomber.get("y", 0)
-            tx, ty = pos_to_cell_int(bx, by)
-            logger.info(f"SPAWN MAPPED: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by}) tile=({tx},{ty})")
+            logger.info(f"SPAWN: {bomber.get('name')} ({bomber.get('uid')}) pixel=({bx},{by})")
         except Exception:
             pass
     

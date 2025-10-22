@@ -64,7 +64,7 @@ class MovementPlanner:
     
     def plan_path(self, goal_cell: Tuple[int, int]) -> None:
         """Lập kế hoạch đường đi dài hạn"""
-        from ..game_state import get_my_bomber, pos_to_cell, pos_to_cell_int, pos_to_cell_int, astar_shortest_path, bfs_shortest_path, is_passable
+        from ..game_state import get_my_bomber, pos_to_cell, pos_to_cell_int, astar_shortest_path, bfs_shortest_path, is_passable
         
         me = get_my_bomber()
         if not me:
@@ -83,16 +83,7 @@ class MovementPlanner:
             self.plan["long_term_goal"] = goal_cell
             self.plan["path_valid"] = True
             logger.info(f"🗺️ PLAN DÀI HẠN: {len(path)} ô từ {current_cell} đến {goal_cell}")
-            logger.info(f"🗺️ PATH CHI TIẾT: {path}")
-            
-            # Hiển thị path từng bước
-            for i, cell in enumerate(path):
-                if i == 0:
-                    logger.info(f"🗺️ BƯỚC {i}: {cell} (vị trí hiện tại)")
-                elif i == len(path) - 1:
-                    logger.info(f"🗺️ BƯỚC {i}: {cell} (mục tiêu cuối)")
-                else:
-                    logger.info(f"🗺️ BƯỚC {i}: {cell}")
+            logger.info(f"🗺️ PATH: {' → '.join(str(cell) for cell in path)}")
         else:
             # Thử BFS
             path_bfs = bfs_shortest_path(current_cell, goal_cell, avoid_hazard=True, avoid_bots=False)
@@ -103,16 +94,7 @@ class MovementPlanner:
                 self.plan["long_term_goal"] = goal_cell
                 self.plan["path_valid"] = True
                 logger.info(f"🗺️ PLAN BFS: {len(path_bfs)} ô từ {current_cell} đến {goal_cell}")
-                logger.info(f"🗺️ PATH CHI TIẾT: {path_bfs}")
-                
-                # Hiển thị path từng bước
-                for i, cell in enumerate(path_bfs):
-                    if i == 0:
-                        logger.info(f"🗺️ BƯỚC {i}: {cell} (vị trí hiện tại)")
-                    elif i == len(path_bfs) - 1:
-                        logger.info(f"🗺️ BƯỚC {i}: {cell} (mục tiêu cuối)")
-                    else:
-                        logger.info(f"🗺️ BƯỚC {i}: {cell}")
+                logger.info(f"🗺️ PATH: {' → '.join(str(cell) for cell in path_bfs)}")
             else:
                 # Tìm ô thay thế gần nhất
                 logger.warning(f"❌ KHÔNG CÓ ĐƯỜNG ĐẾN: {goal_cell} từ {current_cell}")
@@ -133,7 +115,6 @@ class MovementPlanner:
                 
                 if best_cell and best_cell != current_cell:
                     # Tạo path đầy đủ từ current_cell đến goal_cell
-                    from ..game_state import astar_shortest_path
                     full_path = astar_shortest_path(current_cell, goal_cell, avoid_hazard=True, avoid_bots=False)
                     if full_path and len(full_path) > 1:
                         self.plan["path"] = full_path

@@ -144,17 +144,9 @@ def cell_to_pos(cx: int, cy: int) -> Tuple[int, int]:
     """Chuyển ô lưới thành vị trí pixel (tâm ô)"""
     return (cx * CELL_SIZE + CELL_SIZE // 2, cy * CELL_SIZE + CELL_SIZE // 2)
 
-def cell_top_left_pos(cx: int, cy: int) -> Tuple[int, int]:
-    """Trả về tọa độ pixel của góc trên trái của ô (neo top-left)."""
-    return (cx * CELL_SIZE, cy * CELL_SIZE)
-
 def in_bounds(cx: int, cy: int) -> bool:
     """Kiểm tra tọa độ ô có trong map không (0-15)"""
     return 0 <= cx <= 15 and 0 <= cy <= 15
-
-def in_pixel_bounds(x: float, y: float) -> bool:
-    """Kiểm tra vị trí pixel có trong map không"""
-    return 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT
 
 def is_blocked_cell(cell: Optional[str]) -> bool:
     """Kiểm tra ô có chặn di chuyển không (tường và rương)"""
@@ -221,13 +213,6 @@ def get_bomber_speed(uid: str) -> int:
         return min(3, max(1, int(bomber["speed"])))
     return 1
 
-def get_bomber_speed_count(uid: str) -> int:
-    """Lấy số lượng item SPEED đã nhặt"""
-    bomber = get_bomber_by_uid(uid)
-    if bomber and isinstance(bomber.get("speedCount"), (int, float)):
-        return int(bomber["speedCount"])
-    return 0
-
 def get_bomber_bomb_count(uid: str) -> int:
     """Lấy số bom của bomber"""
     bomber = get_bomber_by_uid(uid)
@@ -235,18 +220,11 @@ def get_bomber_bomb_count(uid: str) -> int:
         return int(bomber["bombCount"])
     return 1
 
-def get_explosion_history() -> list:
-    """Lấy lịch sử nổ bom để học phạm vi nổ thực tế"""
-    return game_state.get("explosion_history", [])
-
 def get_item_tile_map() -> dict:
     return game_state.get("item_tile_map", {})
 
 def get_chest_tile_map() -> dict:
     return game_state.get("chest_tile_map", {})
-
-def get_bomb_tile_map() -> dict:
-    return game_state.get("bomb_tile_map", {})
 
 def create_tile_map(items: list, key_func, value_func) -> dict:
     """
@@ -286,8 +264,6 @@ def build_chest_tile_map(chests: list) -> dict:
         lambda chest: True
     )
 
-# Bỏ toàn bộ hiển thị bản đồ để giảm log runtime
-
 def get_tile_item(tile_x: int, tile_y: int) -> str:
     item_map = get_item_tile_map()
     return item_map.get((tile_x, tile_y), "")
@@ -320,8 +296,6 @@ def has_wall_at_tile(tile_x: int, tile_y: int) -> bool:
     except Exception as e:
         logger.error(f"❌ Lỗi has_wall_at_tile: {e}")
         return True  # Lỗi = coi như tường
-
-# Bỏ cơ chế học phạm vi nổ từ log để đơn giản hóa
 
 # ==============================
 #  Fast bitmask-based GameState

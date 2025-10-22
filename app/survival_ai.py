@@ -250,7 +250,7 @@ class SimpleSurvivalAI:
     def _calculate_escape_plan(self, bomb_position: Tuple[int, int], current_cell: Tuple[int, int]) -> Dict[str, Any]:
         """Tính escape plan cho bomb position"""
         try:
-            from .strategies.helpers.escape_planner import EscapePlanner
+            from .helpers.escape_planner import EscapePlanner
             
             # Tính escape path từ bomb position
             escape_result = EscapePlanner.find_escape_path_from_bomb(
@@ -372,8 +372,7 @@ class SimpleSurvivalAI:
             from .game_state import bfs_shortest_path
             path = bfs_shortest_path(current_cell, goal_cell)
             return path is not None and len(path) > 1
-        except:
-            # Fallback: kiểm tra đơn giản
+        except Exception:
             return (abs(goal_cell[0] - current_cell[0]) + abs(goal_cell[1] - current_cell[1])) <= 3
         
     def _find_safe_areas(self, current_cell: Tuple[int, int]) -> List[Tuple[int, int]]:
@@ -401,7 +400,7 @@ class SimpleSurvivalAI:
                     distance = abs(x - current_cell[0]) + abs(y - current_cell[1])
                     if distance <= 5:
                         items.append((x, y))
-        except:
+        except Exception:
             pass
         return items
         
@@ -738,7 +737,7 @@ class SimpleSurvivalAI:
                 distance = abs(x - cell[0]) + abs(y - cell[1])
                 if distance <= radius:
                     items.append((x, y))
-        except:
+        except Exception:
             pass
         
         return items
@@ -869,7 +868,7 @@ class SimpleSurvivalAI:
                     if life_time <= 3500:  # Còn ít hơn 3.5 giây
                         logger.info(f"🏃 CẦN THOÁT: bom sắp nổ tại {bomb_cell}, còn {life_time}ms")
                         return True
-        except:
+        except Exception:
             pass
             
         return False
@@ -882,7 +881,7 @@ class SimpleSurvivalAI:
         # Tìm bom gần nhất
         try:
             from .game_state import game_state, get_bomber_explosion_range
-            from .strategies.helpers.escape_planner import EscapePlanner
+            from .helpers.escape_planner import EscapePlanner
             
             my_uid = game_state.get("my_uid")
             explosion_range = get_bomber_explosion_range(my_uid)
@@ -961,7 +960,7 @@ class SimpleSurvivalAI:
                 
                 if min_distance < 999:
                     score += min_distance * 25.0
-            except:
+            except Exception:
                 pass
             
             if score > best_score:
@@ -1108,7 +1107,7 @@ class SimpleSurvivalAI:
         
         # SỬ DỤNG ADVANCED BOMBING STRATEGY
         try:
-            from .strategies.helpers.advanced_bombing import AdvancedBombingStrategy
+            from .helpers.advanced_bombing import AdvancedBombingStrategy
             
             # Kiểm tra có an toàn để đặt bom không
             should_place = AdvancedBombingStrategy.should_place_bomb_now(
@@ -1248,14 +1247,6 @@ class SimpleSurvivalAI:
                 if path and len(path) >= 2:
                     return self._get_direction_to_cell(cell, path[1])
         return None
-        
-    def _is_cell_passable(self, cell: Tuple[int, int]) -> bool:
-        """Kiểm tra ô có thể đi qua không"""
-        try:
-            from .game_state import is_passable
-            return is_passable(cell[0], cell[1])
-        except:
-            return True
     
     def _find_bomb_position_near_chest(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
         """
@@ -1263,7 +1254,7 @@ class SimpleSurvivalAI:
         Sử dụng AdvancedBombingStrategy với timing calculation và escape planning
         """
         try:
-            from .strategies.helpers.advanced_bombing import AdvancedBombingStrategy
+            from .helpers.advanced_bombing import AdvancedBombingStrategy
             from .game_state import astar_shortest_path, bfs_shortest_path
             
             # Sử dụng advanced strategy để tìm vị trí tốt nhất  
@@ -1413,7 +1404,7 @@ class SimpleSurvivalAI:
                 distance = abs(chest_cell[0] - current_cell[0]) + abs(chest_cell[1] - current_cell[1])
                 if distance <= max_range:
                     chests.append(chest_cell)
-        except:
+        except Exception:
             pass
         return chests
     
@@ -1533,7 +1524,7 @@ class SimpleSurvivalAI:
             try:
                 from .game_state import get_tile_item
                 item_type = get_tile_item(item_cell[0], item_cell[1])
-            except:
+            except Exception:
                 continue
                 
             # Tính điểm ưu tiên
@@ -1549,7 +1540,7 @@ class SimpleSurvivalAI:
                 from .game_state import get_tile_item
                 item_type = get_tile_item(best_item[0], best_item[1])
                 logger.info(f"💎 CHỌN VẬT PHẨM: {item_type} tại {best_item} (score={best_score})")
-            except:
+            except Exception:
                 pass
                 
         return best_item
@@ -1562,29 +1553,6 @@ class SimpleSurvivalAI:
             "BOMB_COUNT": 80,       # Đa bom - ưu tiên trung bình (tăng số bom)
         }
         return priorities.get(item_type, 0)
-    
-    def reset_state(self):
-        """Reset toàn bộ state của AI khi hồi sinh"""
-        logger.info(f"🔄 RESET AI STATE: Reset toàn bộ data")
-        
-        # Reset movement history
-        self.movement_history.clear()
-        self.visited_cells.clear()
-        
-        # Reset timing
-        self.last_action_time = 0
-        self.last_bomb_time_ms = 0
-        self.bomb_exploded_time = 0
-        
-        # Reset bomb tracking
-        self.my_bombs.clear()
-        self.continuous_bombing = False
-        
-        # Reset oscillation detection (nếu có)
-        if hasattr(self, '_oscillation_detector'):
-            self._oscillation_detector.clear()
-        
-        logger.info(f"✅ AI STATE RESET: Hoàn thành reset")
     
     def _create_long_term_plan(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Dict]:
         """Tạo plan dài hạn với mục tiêu rõ ràng"""

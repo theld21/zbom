@@ -95,15 +95,11 @@ async def lifespan(app: FastAPI):
         pass
     logger.info("🚀 Khởi động bot...")
     try:
-        # Tạm thời tắt AI đa luồng
-        # multithread_ai.start()
         await startup()
         logger.info("🚀 Bot đã sẵn sàng")
     except Exception as e:
         logger.error(f"🚀 Lỗi khởi động: {e}")
     yield
-    # Dừng AI đa luồng
-    # multithread_ai.stop()
     logger.info("🚀 Bot đã dừng")
 
 app = FastAPI(lifespan=lifespan)
@@ -234,7 +230,6 @@ async def send_move(orient: str):
             return
     
     try:
-        # cmd_limiter đã đảm bảo rate limiting (58 cmd/s)
         async with cmd_limiter:
             await sio.emit("move", {"orient": orient}, callback=_ack_logger("move"))
         movement_logger.log_movement(orient, LOG_MOVEMENT)
@@ -243,13 +238,6 @@ async def send_move(orient: str):
 
 async def send_bomb():
     """Gửi lệnh đặt bom"""
-    # Kiểm tra bot có thể di chuyển không
-    me = get_my_bomber()
-    # if me and not me.get("movable", True):
-    #     logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Bot không thể di chuyển")
-    #     logger.warning(f"🔍 ME DETAILS: {me}")
-    #     return
-    
     # Kiểm tra game đã bắt đầu chưa
     if not game_state.get("game_started", False):
         # Trong môi trường dev, cho phép đặt bom mà không cần start event
@@ -260,7 +248,6 @@ async def send_bomb():
             return
     
     try:
-        # cmd_limiter đã đảm bảo rate limiting (58 cmd/s)
         async with cmd_limiter:
             await sio.emit("place_bomb", {}, callback=_ack_logger("place_bomb"))
         logger.info(f"💣 ĐẶT BOM")
@@ -354,26 +341,12 @@ async def bot_loop():
                     continue
                 
                 # Khai báo tất cả biến global cần thiết
-                global _arrival_block_until, _last_pos, _stuck_count, _recent_orient, _reverse_block_until
+                global _arrival_block_until, _last_pos, _stuck_count
                 
                 # Nếu vừa tới nơi, tạm không nhận action/fallback để tránh đảo chiều (dwell)
                 if time.monotonic() < _arrival_block_until:
                     await asyncio.sleep(period)
                     continue
-                
-                # BỎ QUA stuck detection để bot luôn có thể di chuyển
-                # cur_pos = (me.get("x", 0.0), me.get("y", 0.0))
-                # if abs(cur_pos[0] - _last_pos[0]) < 0.1 and abs(cur_pos[1] - _last_pos[1]) < 0.1:
-                #     _stuck_count += 1
-                #     if _stuck_count >= 20:  
-                #         logger.info(f"🚫 STUCK: Bot không di chuyển trong {_stuck_count} tick, tạm dừng movement")
-                #         _reset_movement_plan()
-                #         _arrival_block_until = time.monotonic() + 0.1
-                #         await asyncio.sleep(period)
-                #         continue
-                # else:
-                #     _stuck_count = 0
-                # _last_pos = cur_pos
                 
                 # Check và log khi bot vào ô mới
                 movement_logger.check_and_log_cell_arrival(LOG_MOVEMENT)

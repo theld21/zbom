@@ -3,7 +3,7 @@ Bombing logic helpers
 """
 
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +14,8 @@ class BombingHelper:
     @staticmethod
     def has_chest_in_bomb_range(cell: Tuple[int, int]) -> bool:
         """Kiểm tra có rương trong tầm nổ không"""
-        from ...game_state import game_state, has_chest_at_tile, has_wall_at_tile, in_bounds, get_bomber_explosion_range
-        from ...config import DIRECTIONS
+        from ..game_state import game_state, has_chest_at_tile, has_wall_at_tile, in_bounds, get_bomber_explosion_range
+        from ..config import DIRECTIONS
         
         try:
             my_uid = game_state.get("my_uid")
@@ -46,8 +46,8 @@ class BombingHelper:
     @staticmethod
     def has_escape_after_bomb(cell: Tuple[int, int]) -> bool:
         """Kiểm tra có lối thoát sau khi đặt bom không"""
-        from ...game_state import game_state, get_bomber_explosion_range
-        from ...config import DIRECTIONS
+        from ..game_state import game_state, get_bomber_explosion_range
+        from ..config import DIRECTIONS
         from .navigation import NavigationHelper
         
         try:
@@ -75,13 +75,7 @@ class BombingHelper:
                         NavigationHelper.is_cell_passable(check_cell)):
                         safe_cells.append(check_cell)
             
-            has_escape = len(safe_cells) > 0
-            if has_escape:
-                logger.info(f"✅ CÓ LỐI THOÁT: {len(safe_cells)} ô an toàn")
-            else:
-                logger.info(f"🚫 KHÔNG CÓ LỐI THOÁT")
-            
-            return has_escape
+            return len(safe_cells) > 0
         except Exception as e:
             logger.error(f"❌ Lỗi kiểm tra lối thoát: {e}")
             return False
@@ -89,12 +83,11 @@ class BombingHelper:
     @staticmethod
     def find_chests_in_range(current_cell: Tuple[int, int], max_range: int) -> List[Tuple[int, int]]:
         """Tìm rương trong tầm (hoặc toàn bộ map nếu max_range >= 16)"""
-        from ...game_state import game_state, pos_to_cell
+        from ..game_state import game_state, pos_to_cell
         
         chests = []
         try:
             chest_data = game_state.get("chests", [])
-            logger.debug(f"🔍 TÌM RƯƠNG: Có {len(chest_data)} rương, max_range={max_range}")
             
             for chest in chest_data:
                 chest_cell = pos_to_cell(chest.get("x", 0), chest.get("y", 0))
@@ -102,12 +95,9 @@ class BombingHelper:
                 if max_range >= 16:
                     chests.append(chest_cell)
                 else:
-                    # Manhattan distance
                     distance = abs(chest_cell[0] - current_cell[0]) + abs(chest_cell[1] - current_cell[1])
                     if distance <= max_range:
                         chests.append(chest_cell)
-            
-            logger.debug(f"🔍 TÌM RƯƠNG: Tìm thấy {len(chests)} rương trong tầm")
         except Exception as e:
             logger.error(f"❌ Lỗi tìm rương: {e}")
         return chests

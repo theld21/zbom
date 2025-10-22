@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code and entry point
 COPY app/ ./app/
 COPY run_bot.py ./
-COPY optimized_strategy.json ./
 
 # Create logs directory with proper permissions
 RUN mkdir -p /app/logs && chown -R bomber:bomber /app/logs

@@ -20,7 +20,7 @@ class NavigationHelper:
             cell: Vị trí (1-indexed)
             avoid_bombs: Có tránh blast zones của bombs không
         """
-        from ...game_state import get_fast_state
+        from ..game_state import get_fast_state
         
         fs = get_fast_state()
         if not fs.static:
@@ -35,11 +35,11 @@ class NavigationHelper:
         # Check bomb blast zones nếu được yêu cầu
         if avoid_bombs:
             try:
-                from ...models.bomb_tracker import get_bomb_tracker
+                from ..models.bomb_tracker import get_bomb_tracker
                 bomb_tracker = get_bomb_tracker()
                 if bomb_tracker.is_cell_dangerous(cell):
                     return False
-            except:
+            except Exception:
                 pass
         
         return True
@@ -47,7 +47,7 @@ class NavigationHelper:
     @staticmethod
     def get_neighbors(cell: Tuple[int, int]) -> List[Tuple[int, int]]:
         """Lấy các ô lân cận có thể đi qua"""
-        from ...config import DIRECTIONS
+        from ..config import DIRECTIONS
         
         neighbors = []
         for dx, dy in DIRECTIONS.values():
@@ -76,11 +76,10 @@ class NavigationHelper:
     @staticmethod
     def can_reach_goal(current_cell: Tuple[int, int], goal_cell: Tuple[int, int]) -> bool:
         """Kiểm tra có thể đến đích không"""
-        from ...game_state import bfs_shortest_path
+        from ..game_state import bfs_shortest_path
         
         try:
             path = bfs_shortest_path(current_cell, goal_cell)
             return path is not None and len(path) > 1
-        except:
-            # Fallback
+        except Exception:
             return (abs(goal_cell[0] - current_cell[0]) + abs(goal_cell[1] - current_cell[1])) <= 3

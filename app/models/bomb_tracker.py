@@ -178,7 +178,3 @@ _bomb_tracker = BombTracker()
 def get_bomb_tracker() -> BombTracker:
     """Lấy global bomb tracker instance"""
     return _bomb_tracker
-
-
-
-

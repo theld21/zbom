@@ -3,7 +3,6 @@ Advanced bombing strategy với timing và safety checks
 """
 
 import logging
-import time
 from typing import Tuple, Optional, List, Dict
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ class AdvancedBombingStrategy:
         Returns:
             Best position hoặc None
         """
-        from ...game_state import game_state, get_bomber_explosion_range, pos_to_cell
+        from ..game_state import game_state, get_bomber_explosion_range, pos_to_cell
         from .escape_planner import EscapePlanner
         from .bombing import BombingHelper
         
@@ -52,8 +51,6 @@ class AdvancedBombingStrategy:
             logger.info(f"🔍 KHÔNG CÓ RƯƠNG trong tầm tìm kiếm (max_range={max_search_radius})")
             return None
         
-        logger.debug(f"🔍 TÌM THẤY {len(chests)} RƯƠNG: {chests[:5]}...")  # Log 5 rương đầu
-        
         # Đánh giá từng vị trí có thể đặt bom
         candidates = []
         
@@ -68,7 +65,6 @@ class AdvancedBombingStrategy:
                 if blacklist and bomb_pos in blacklist:
                     blacklist_time = blacklist[bomb_pos]
                     if current_time - blacklist_time < 5000:  # Blacklist 5s
-                        logger.debug(f"⚠️ BỎ QUA {bomb_pos}: đang trong blacklist")
                         continue
                 
                 # Kiểm tra vị trí có thể đi qua không
@@ -78,7 +74,7 @@ class AdvancedBombingStrategy:
                 
                 # QUAN TRỌNG 1: Kiểm tra có ĐƯỜNG ĐI đến vị trí này không
                 if bomb_pos != current_position:
-                    from ...game_state import astar_shortest_path
+                    from ..game_state import astar_shortest_path
                     path_to_bomb = astar_shortest_path(current_position, bomb_pos, avoid_hazard=True, avoid_bots=False)
                     if not path_to_bomb or len(path_to_bomb) < 2:
                         # Vị trí không thể đến được, bỏ qua
@@ -97,10 +93,6 @@ class AdvancedBombingStrategy:
                 )
                 
                 candidates.append((bomb_pos, score, chest))
-                logger.debug(
-                    f"💎 ỨNG VIÊN: {bomb_pos} → nổ {chest}, "
-                    f"score={score:.1f}"
-                )
         
         if not candidates:
             logger.warning("⚠️ KHÔNG CÓ VỊ TRÍ ĐẶT BOM AN TOÀN")
@@ -123,8 +115,8 @@ class AdvancedBombingStrategy:
         explosion_range: int
     ) -> List[Tuple[int, int]]:
         """Tìm các vị trí có thể đặt bom để nổ target"""
-        from ...game_state import game_state
-        from ...config import DIRECTIONS
+        from ..game_state import game_state
+        from ..config import DIRECTIONS
         
         positions = []
         map_data = game_state.get("map", [])
@@ -186,14 +178,13 @@ class AdvancedBombingStrategy:
             score += 50
         
         # 4. Số lượng targets trong tầm nổ
-        from .bombing import BombingHelper
         num_chests_in_range = len(AdvancedBombingStrategy._count_targets_in_blast(
             bomb_position, explosion_range
         ))
         score += num_chests_in_range * 30
         
         # 5. Kiểm tra có bot khác gần đó (nguy hiểm)
-        from ...game_state import game_state, pos_to_cell_bot
+        from ..game_state import game_state, pos_to_cell_bot
         my_uid = game_state.get("my_uid")
         for bomber in game_state.get("bombers", []):
             if bomber.get("uid") == my_uid or not bomber.get("isAlive", True):
@@ -213,8 +204,8 @@ class AdvancedBombingStrategy:
         explosion_range: int
     ) -> List[Tuple[int, int]]:
         """Đếm số targets (chests) trong vùng nổ"""
-        from ...game_state import game_state, pos_to_cell
-        from ...config import DIRECTIONS
+        from ..game_state import game_state, pos_to_cell
+        from ..config import DIRECTIONS
         
         targets = []
         map_data = game_state.get("map", [])
@@ -272,7 +263,7 @@ class AdvancedBombingStrategy:
             return False
         
         # Kiểm tra có target trong tầm nổ
-        from ...game_state import game_state, get_bomber_explosion_range
+        from ..game_state import game_state, get_bomber_explosion_range
         from .bombing import BombingHelper
         
         my_uid = game_state.get("my_uid")
