@@ -589,34 +589,6 @@ class SimpleSurvivalAI:
             if len(self.movement_history) > 10:
                 self.movement_history = self.movement_history[-10:]
         
-    def _should_idle(self, cell: Tuple[int, int], current_time: float) -> bool:
-        """Quyết định có nên đứng im không (chiến lược sinh tồn) - GIẢM NGHIÊM NGẶT"""
-        my_uid = game_state.get("my_uid")
-        if not my_uid:
-            return False
-            
-        # Tính thời gian di chuyển dựa trên tốc độ
-        move_time = self._get_move_time_ms(my_uid)
-        future_time = current_time + move_time * 2  # Dự báo 2 bước
-        
-        # CHỈ đứng im khi có nguy hiểm THỰC SỰ (giảm nghiêm ngặt)
-        future_danger = self._is_in_danger(cell, future_time)
-        if future_danger:
-            return True
-            
-        # GIẢM yêu cầu: chỉ đứng im khi có 3/4 hướng nguy hiểm (thay vì 2/4)
-        danger_directions = 0
-        for dx, dy in DIRECTIONS.values():
-            next_cell = (cell[0] + dx, cell[1] + dy)
-            if self._is_in_danger(next_cell, future_time):
-                danger_directions += 1
-                
-        # CHỈ đứng im khi có 3 hướng trở lên có nguy hiểm (thay vì 2)
-        if danger_directions >= 3:
-            return True
-                
-        return False
-        
     def _has_enemies_nearby(self, cell: Tuple[int, int], radius: int = 2) -> bool:
         """Kiểm tra có đối thủ gần đó không (giảm radius để ít nhạy cảm hơn)"""
         my_uid = game_state.get("my_uid")
@@ -874,104 +846,47 @@ class SimpleSurvivalAI:
         return False
     
     def _get_escape_move(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Dict[str, Any]]:
-        """
-        Tìm nước đi để thoát khỏi vùng nguy hiểm
-        CÁCH MỚI: Sử dụng EscapePlanner với timing calculation
-        """
-        # Tìm bom gần nhất
+        """Tìm nước đi để thoát khỏi vùng nguy hiểm"""
         try:
-            from .game_state import game_state, get_bomber_explosion_range
             from .helpers.escape_planner import EscapePlanner
             
             my_uid = game_state.get("my_uid")
             explosion_range = get_bomber_explosion_range(my_uid)
             bombs = game_state.get("bombs", [])
             
-            if not bombs:
-                # Không có bom, dùng logic cũ
-                return self._get_escape_move_legacy(current_cell, current_time)
-            
-            # Tìm bom gần nhất và nguy hiểm nhất
-            nearest_bomb = None
-            min_distance = 999
-            
-            for bomb in bombs:
-                bomb_x, bomb_y = bomb.get("x", 0), bomb.get("y", 0)
-                bomb_cell = pos_to_cell_bot(bomb_x, bomb_y)
-                distance = abs(bomb_cell[0] - current_cell[0]) + abs(bomb_cell[1] - current_cell[1])
+            # Tìm bom gần nhất
+            if bombs:
+                nearest_bomb = min(bombs, key=lambda b: abs(pos_to_cell_bot(b.get("x", 0), b.get("y", 0))[0] - current_cell[0]) + 
+                                                         abs(pos_to_cell_bot(b.get("x", 0), b.get("y", 0))[1] - current_cell[1]))
+                bomb_cell = pos_to_cell_bot(nearest_bomb.get("x", 0), nearest_bomb.get("y", 0))
+                life_time = nearest_bomb.get("lifeTime", 5000)
                 
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_bomb = (bomb_cell, bomb.get("lifeTime", 5000))
-            
-            if nearest_bomb:
-                bomb_pos, life_time = nearest_bomb
-                
-                # Sử dụng EscapePlanner để tìm đường thoát
-                result = EscapePlanner.find_escape_path_from_bomb(
-                    bomb_pos, current_cell, explosion_range, life_time
-                )
-                
-                if result:
-                    path, escape_time = result
-                    if len(path) >= 2:
-                        next_cell = path[1]
-                        logger.info(
-                            f"✅ ESCAPE PLANNER: Thoát từ {current_cell} → {next_cell}, "
-                            f"thời gian={escape_time:.0f}ms < {life_time:.0f}ms"
-                        )
-                        self._update_last_direction(current_cell, next_cell)
-                        return {"type": "move", "goal_cell": next_cell}
-                else:
-                    logger.warning(f"⚠️ ESCAPE PLANNER: Không tìm thấy đường thoát từ {bomb_pos}")
-            
-            # Fallback về logic cũ nếu không tìm được đường
-            return self._get_escape_move_legacy(current_cell, current_time)
-            
+                result = EscapePlanner.find_escape_path_from_bomb(bomb_cell, current_cell, explosion_range, life_time)
+                if result and len(result[0]) >= 2:
+                    next_cell = result[0][1]
+                    logger.info(f"✅ ESCAPE: {current_cell} → {next_cell}, t={result[1]:.0f}ms < {life_time:.0f}ms")
+                    self._update_last_direction(current_cell, next_cell)
+                    return {"type": "move", "goal_cell": next_cell}
         except Exception as e:
-            logger.error(f"❌ Lỗi escape planner: {e}, fallback về logic cũ")
-            return self._get_escape_move_legacy(current_cell, current_time)
-    
-    def _get_escape_move_legacy(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Dict[str, Any]]:
-        """Tìm nước đi thoát hiểm - Legacy method"""
+            logger.error(f"❌ Lỗi escape: {e}")
+        
+        # Fallback: tìm ô an toàn gần nhất
         best_move = None
         best_score = -1
-        
         for direction in ["UP", "DOWN", "LEFT", "RIGHT"]:
             dx, dy = DIRECTIONS[direction]
             next_cell = (current_cell[0] + dx, current_cell[1] + dy)
-            
             if not self._is_cell_passable(next_cell):
                 continue
-                
-            score = 0.0
-            if not self._is_in_danger(next_cell, current_time):
-                score += 100.0
-            
-            try:
-                from .game_state import game_state
-                bombs = game_state.get("bombs", [])
-                min_distance = 999
-                for bomb in bombs:
-                    bomb_x, bomb_y = bomb.get("x", 0), bomb.get("y", 0)
-                    bomb_cell = pos_to_cell_bot(bomb_x, bomb_y)
-                    distance = abs(bomb_cell[0] - next_cell[0]) + abs(bomb_cell[1] - next_cell[1])
-                    min_distance = min(min_distance, distance)
-                
-                if min_distance < 999:
-                    score += min_distance * 25.0
-            except Exception:
-                pass
-            
+            score = 100.0 if not self._is_in_danger(next_cell, current_time) else 0.0
             if score > best_score:
                 best_score = score
                 best_move = next_cell
         
         if best_move:
-            logger.info(f"🏃 LEGACY ESCAPE: {current_cell} → {best_move} (score={best_score})")
+            logger.info(f"🏃 ESCAPE FALLBACK: {current_cell} → {best_move}")
             self._update_last_direction(current_cell, best_move)
             return {"type": "move", "goal_cell": best_move}
-        
         return None
         
     def _is_in_danger(self, cell: Tuple[int, int], current_time: float) -> bool:
@@ -1249,95 +1164,26 @@ class SimpleSurvivalAI:
         return None
     
     def _find_bomb_position_near_chest(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
-        """
-        Tìm vị trí đặt bom gần rương - CÁCH MỚI
-        Sử dụng AdvancedBombingStrategy với timing calculation và escape planning
-        """
+        """Tìm vị trí đặt bom gần rương"""
         try:
             from .helpers.advanced_bombing import AdvancedBombingStrategy
-            from .game_state import astar_shortest_path, bfs_shortest_path
+            from .game_state import astar_shortest_path
             
-            # Sử dụng advanced strategy để tìm vị trí tốt nhất  
-            # QUAN TRỌNG: Truyền blacklist để tránh chọn vị trí đã fail
             best_position = AdvancedBombingStrategy.find_best_bombing_position(
-                current_cell, 
-                max_search_radius=16,
-                blacklist=self.failed_bomb_positions,
-                current_time=current_time
+                current_cell, max_search_radius=16,
+                blacklist=self.failed_bomb_positions, current_time=current_time
             )
             
-            if best_position:
-                # CHECK BLACKLIST TRƯỚC
-                if self._is_position_blacklisted(best_position, current_time):
-                    logger.warning(f"⚠️ VỊ TRÍ {best_position} BỊ BLACKLIST, bỏ qua")
-                    return None
-                
-                # QUAN TRỌNG: Kiểm tra có ĐƯỜNG ĐI đến vị trí đó không
+            if best_position and not self._is_position_blacklisted(best_position, current_time):
                 if best_position != current_cell:
                     path = astar_shortest_path(current_cell, best_position, avoid_hazard=True, avoid_bots=False)
                     if not path or len(path) < 2:
-                        # Thử BFS
-                        path = bfs_shortest_path(current_cell, best_position, avoid_hazard=True, avoid_bots=False)
-                    
-                    if not path or len(path) < 2:
-                        logger.warning(f"⚠️ KHÔNG CÓ ĐƯỜNG ĐẾN {best_position} từ {current_cell}, bỏ qua")
                         return None
-                    
-                    logger.info(f"✅ CÓ ĐƯỜNG ĐẾN: {len(path)-1} bước từ {current_cell} → {best_position}")
-                
-                logger.info(f"🎯 ADVANCED: Tìm thấy vị trí đặt bom tối ưu {best_position}")
+                logger.info(f"🎯 Tìm thấy vị trí đặt bom: {best_position}")
                 return best_position
-            else:
-                logger.info(f"🔍 ADVANCED: Không tìm thấy vị trí an toàn")
-                return None
-                
         except Exception as e:
-            logger.error(f"❌ Lỗi advanced bombing: {e}, fallback về logic cũ")
-            # Fallback về logic cũ nếu có lỗi
-            return self._find_bomb_position_near_chest_legacy(current_cell, current_time)
-    
-    def _find_bomb_position_near_chest_legacy(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
-        """Tìm vị trí đặt bom - Legacy method"""
-        chests = self._find_chests_in_range(current_cell, 6)
-        if not chests:
-            return None
-            
-        best_position = None
-        best_score = -1
-        chests.sort(key=lambda c: abs(c[0] - current_cell[0]) + abs(c[1] - current_cell[1]))
-        
-        for chest in chests:
-            bomb_positions = self._get_bomb_positions_for_chest_with_range(chest)
-            bomb_positions.sort(key=lambda pos: abs(pos[0] - current_cell[0]) + abs(pos[1] - current_cell[1]))
-            
-            for bomb_pos in bomb_positions:
-                if self._is_position_blacklisted(bomb_pos, current_time):
-                    continue
-                    
-                if (self._is_cell_passable(bomb_pos) and 
-                    not self._is_in_danger(bomb_pos, current_time + 2000) and
-                    not self._has_dangerous_bombs_nearby(bomb_pos, current_time) and
-                    self._has_escape_after_bomb(bomb_pos)):
-                    
-                    distance_to_chest = abs(bomb_pos[0] - chest[0]) + abs(bomb_pos[1] - chest[1])
-                    distance_to_bot = abs(bomb_pos[0] - current_cell[0]) + abs(bomb_pos[1] - current_cell[1])
-                    score = 100 - distance_to_chest - distance_to_bot
-                    
-                    if bomb_pos in self.movement_history[-5:]:
-                        score -= 100
-                    if bomb_pos == current_cell:
-                        score += 50
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_position = bomb_pos
-                    if score > 80:
-                        break
-                        
-        if best_position:
-            logger.info(f"🎯 LEGACY: Tìm thấy vị trí {best_position} (score={best_score})")
-            
-        return best_position
+            logger.error(f"❌ Lỗi bombing: {e}")
+        return None
     
     def _is_position_blacklisted(self, position: Tuple[int, int], current_time: float) -> bool:
         """Kiểm tra vị trí có trong blacklist không"""
@@ -1624,52 +1470,6 @@ class SimpleSurvivalAI:
         except Exception as e:
             logger.error(f"Lỗi kiểm tra bom nguy hiểm: {e}")
         return False
-    
-    def _find_alternative_bomb_position(self, current_cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
-        """Tìm vị trí đặt bom thay thế khi tránh vòng lặp"""
-        logger.info(f"🔍 TÌM VỊ TRÍ ĐẶT BOM THAY THẾ: từ {current_cell}")
-        
-        # Tìm rương trong tầm 8 ô (mở rộng tầm tìm kiếm)
-        chests = self._find_chests_in_range(current_cell, 8)
-        if not chests:
-            return None
-            
-        # Tìm vị trí đặt bom tốt nhất (tránh vòng lặp)
-        best_position = None
-        best_score = -1
-        
-        for chest in chests:
-            bomb_positions = self._get_bomb_positions_for_chest(chest)
-            for bomb_pos in bomb_positions:
-                # Kiểm tra không phải vị trí đã đi gần đây
-                if (bomb_pos not in self.movement_history[-5:] and
-                    bomb_pos != current_cell and
-                    self._is_cell_passable(bomb_pos) and 
-                    not self._is_in_danger(bomb_pos, current_time + 2000) and
-                    not self._has_dangerous_bombs_nearby(bomb_pos, current_time) and
-                    self._has_escape_after_bomb(bomb_pos)):
-                    
-                    # Tính điểm ưu tiên
-                    distance_to_chest = abs(bomb_pos[0] - chest[0]) + abs(bomb_pos[1] - chest[1])
-                    distance_to_bot = abs(bomb_pos[0] - current_cell[0]) + abs(bomb_pos[1] - current_cell[1])
-                    
-                    # Ưu tiên: gần rương, gần bot, chưa đi gần đây
-                    score = 100 - distance_to_chest - distance_to_bot
-                    
-                    # Bonus cho vị trí chưa thăm
-                    if bomb_pos not in self.visited_cells:
-                        score += 20
-                    
-                    if score > best_score:
-                        best_score = score
-                        best_position = bomb_pos
-                        
-        if best_position:
-            logger.info(f"🎯 TÌM THẤY VỊ TRÍ THAY THẾ: {best_position} (score={best_score})")
-        else:
-            logger.info(f"🔍 KHÔNG TÌM THẤY vị trí thay thế")
-            
-        return best_position
 
 # Instance toàn cục
 survival_ai = SimpleSurvivalAI()

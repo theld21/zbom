@@ -31,8 +31,7 @@ from .socket_handlers import (
 )
 
 # Import utils
-from .utils.movement_logger import MovementLogger
-from .utils.map_logger import log_map_state
+from .utils.loggers import MovementLogger, log_map_state
 from .utils.movement_planner import get_movement_planner
 
 # Giới hạn tốc độ gửi lệnh

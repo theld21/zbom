@@ -149,7 +149,7 @@ class EscapePlanner:
         max_distance: int = 8
     ) -> List[Tuple[int, int]]:
         """Tìm các ô an toàn gần nhất ngoài blast zone"""
-        from .navigation import NavigationHelper
+        from .game_helpers import NavigationHelper
         
         safe_cells = []
         

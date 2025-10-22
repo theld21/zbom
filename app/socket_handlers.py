@@ -12,7 +12,7 @@ from .game_state import (
     fast_init_from_user, fast_handle_new_bomb, fast_handle_bomb_explode, fast_handle_map_update,
     build_item_tile_map, build_chest_tile_map
 )
-from .utils.map_logger import log_map_state
+from .utils.loggers import log_map_state
 from .config import BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, LOG_BOMB_EVENTS
 
 logger = logging.getLogger("bot")

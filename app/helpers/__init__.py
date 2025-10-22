@@ -2,9 +2,7 @@
 Helper modules cho AI strategies
 """
 
-from .danger import DangerDetector
-from .navigation import NavigationHelper
-from .bombing import BombingHelper
+from .game_helpers import DangerDetector, NavigationHelper, BombingHelper
 from .escape_planner import EscapePlanner
 from .advanced_bombing import AdvancedBombingStrategy
 

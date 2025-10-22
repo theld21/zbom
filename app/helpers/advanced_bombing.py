@@ -36,7 +36,7 @@ class AdvancedBombingStrategy:
         """
         from ..game_state import game_state, get_bomber_explosion_range, pos_to_cell
         from .escape_planner import EscapePlanner
-        from .bombing import BombingHelper
+        from .game_helpers import BombingHelper
         
         my_uid = game_state.get("my_uid")
         if not my_uid:
@@ -68,7 +68,7 @@ class AdvancedBombingStrategy:
                         continue
                 
                 # Kiểm tra vị trí có thể đi qua không
-                from .navigation import NavigationHelper
+                from .game_helpers import NavigationHelper
                 if not NavigationHelper.is_cell_passable(bomb_pos):
                     continue
                 
@@ -264,7 +264,7 @@ class AdvancedBombingStrategy:
         
         # Kiểm tra có target trong tầm nổ
         from ..game_state import game_state, get_bomber_explosion_range
-        from .bombing import BombingHelper
+        from .game_helpers import BombingHelper
         
         my_uid = game_state.get("my_uid")
         explosion_range = get_bomber_explosion_range(my_uid)
