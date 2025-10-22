@@ -8,7 +8,7 @@ import time
 from typing import Dict, Any
 
 from .game_state import (
-    game_state, get_my_bomber, get_my_cell,
+    game_state, get_my_bomber, get_my_cell, get_bomber_explosion_range,
     fast_init_from_user, fast_handle_new_bomb, fast_handle_bomb_explode, fast_handle_map_update,
     build_item_tile_map, build_chest_tile_map
 )
@@ -17,7 +17,39 @@ from .config import BOT_NAME, LOG_SOCKET, LOG_GAME_EVENTS, LOG_ITEM_COLLECTION, 
 
 logger = logging.getLogger("bot")
 
+# ========== HELPER FUNCTIONS ==========
+def _to_tile(x: float, y: float) -> tuple:
+    """Convert pixel coordinates to tile coordinates"""
+    return (int(x // 40), int(y // 40))
 
+def _update_item_map(items: list) -> None:
+    """Update item tile map in game_state"""
+    game_state["item_tile_map"] = build_item_tile_map(items)
+
+def _update_chest_map(chests: list) -> None:
+    """Update chest tile map in game_state"""
+    game_state["chest_tile_map"] = build_chest_tile_map(chests)
+
+def _reset_bomb_tracker() -> None:
+    """Reset bomb tracker"""
+    try:
+        from .models.bomb_tracker import get_bomb_tracker
+        get_bomb_tracker().clear()
+        logger.info("🎯 BOMB TRACKER RESET")
+    except Exception as e:
+        logger.error(f"❌ Lỗi reset Bomb Tracker: {e}")
+
+def _reset_ai_state() -> None:
+    """Reset AI state"""
+    try:
+        from .survival_ai import survival_ai
+        if survival_ai:
+            survival_ai.reset_state()
+            logger.info("🔄 AI RESET")
+    except Exception as e:
+        logger.error(f"❌ Lỗi reset AI: {e}")
+
+# ========== SOCKET HANDLERS ==========
 def handle_connect():
     """Xử lý kết nối socket"""
     game_state["connected"] = True
@@ -40,35 +72,15 @@ def handle_disconnect():
 
 def handle_user(data: Dict[str, Any]):
     """Xử lý sự kiện user - ảnh chụp thế giới ban đầu"""
-    # Reset dữ liệu game khi có sự kiện user mới (game mới)
-    logger.info("🔄 RESET GAME DATA: Khởi tạo lại dữ liệu game")
+    logger.info("🔄 RESET GAME DATA")
     
     # Reset game_state
     game_state.update({
-        "connected": True,
-        "my_uid": None,
-        "game_started": False,
-        "map": [],
-        "bombers": [],
-        "bombs": [],
-        "items": [],
-        "chests": [],
-        "last_bomb_explosions": [],
-        "active_bombs": [],
-        "item_tile_map": {},
-        "chest_tile_map": {},
-        "bomb_tile_map": {},
-        "explosion_history": []
+        "connected": True, "my_uid": None, "game_started": False,
+        "map": [], "bombers": [], "bombs": [], "items": [], "chests": [],
+        "last_bomb_explosions": [], "active_bombs": [],
+        "item_tile_map": {}, "chest_tile_map": {}, "bomb_tile_map": {}, "explosion_history": []
     })
-    
-    logger.info("🔄 RESET COMPLETE: Tất cả dữ liệu game đã được reset")
-    
-    if LOG_GAME_EVENTS:
-        logger.info(f"📥 USER RESPONSE: map={len(data.get('map', []))}x{len(data.get('map', [[]])[0]) if data.get('map') else 'empty'}")
-        logger.info(f"📥 USER RESPONSE: bombers={len(data.get('bombers', []))}")
-        logger.info(f"📥 USER RESPONSE: bombs={len(data.get('bombs', []))}")
-        logger.info(f"📥 USER RESPONSE: items={len(data.get('items', []))}")
-        logger.info(f"📥 USER RESPONSE: chests={len(data.get('chests', []))}")
     
     # Cập nhật trạng thái thế giới
     game_state.update({
@@ -79,72 +91,32 @@ def handle_user(data: Dict[str, Any]):
         "chests": data.get("chests") or []
     })
     
-    if LOG_GAME_EVENTS:
-        for i, bomber in enumerate(game_state["bombers"]):
-            logger.info(f"📥 BOMBER {i}: {bomber.get('name')} ({bomber.get('uid')}) - "
-                       f"pos=({bomber.get('x')}, {bomber.get('y')}) - "
-                       f"speed={bomber.get('speed')} - bombs={bomber.get('bombCount')} - "
-                       f"alive={bomber.get('isAlive')} - movable={bomber.get('movable')}")
-    
-    # Tìm bot của chúng ta
+    # Tìm bot
     uids = [b.get("uid") for b in game_state["bombers"]]
-    logger.info(f"🔍 TÌM BOT: my_uid={game_state['my_uid']} không có trong danh sách {uids}")
-    
-    for i, b in enumerate(game_state["bombers"]):
-        logger.info(f"🔍 BOMBER {i}: name='{b.get('name')}' uid='{b.get('uid')}'")
-    
     if game_state["my_uid"] not in uids and uids:
-        # Ưu tiên chọn theo tên bot cấu hình
-        logger.info(f"🔍 TÌM BOT THEO TÊN: BOT_NAME='{BOT_NAME}'")
         mine = next((b for b in game_state["bombers"] 
                     if isinstance(b.get("name"), str) and b["name"].lower() == BOT_NAME.lower()), None)
-        if mine:
-            game_state["my_uid"] = mine.get("uid")
-            logger.info(f"🤖 TÌM THẤY BOT THEO TÊN: {mine.get('name')} ({mine.get('uid')})")
-        else:
-            # Fallback: chọn bomber đầu tiên
-            game_state["my_uid"] = game_state["bombers"][0].get("uid")
-            logger.info(f"🤖 CHỌN BOMBER ĐẦU TIÊN (FALLBACK): {game_state['bombers'][0].get('name')} ({game_state['my_uid']})")
-    else:
-        logger.info(f"🤖 BOT ĐÃ TỒN TẠI: {game_state['my_uid']}")
+        game_state["my_uid"] = mine.get("uid") if mine else game_state["bombers"][0].get("uid")
+        logger.info(f"🤖 BOT: {mine.get('name') if mine else game_state['bombers'][0].get('name')} ({game_state['my_uid']})")
     
-    # Kiểm tra game có bắt đầu không
-    is_start = data.get("isStart", False)
-    if is_start:
+    # Game started
+    if data.get("isStart", False):
         game_state["game_started"] = True
     
-    try:
-        for b in game_state.get("bombers", []):
-            bx, by = b.get("x", 0), b.get("y", 0)
-            logger.info(f"SPAWN: {b.get('name')} ({b.get('uid')}) pixel=({bx},{by})")
-    except Exception:
-        pass
-
-    # Tạo bản đồ tile cho items ban đầu (tối ưu)
-    items = game_state.get("items", [])
-    item_tile_map = build_item_tile_map(items)
-    game_state["item_tile_map"] = item_tile_map
-    
-    # Tạo bản đồ tile cho chests ban đầu (tối ưu)
-    chests = game_state.get("chests", [])
-    chest_tile_map = build_chest_tile_map(chests)
-    game_state["chest_tile_map"] = chest_tile_map
-    
-    # Khởi tạo bomb_tile_map ban đầu
+    # Update tile maps
+    _update_item_map(game_state.get("items", []))
+    _update_chest_map(game_state.get("chests", []))
     game_state["bomb_tile_map"] = {}
     game_state["active_bombs"] = []
     
-    # Log trạng thái thế giới
-    logger.info(f"🌍 Thế giới: map={len(game_state['map'])}x{len(game_state['map'][0]) if game_state['map'] else 'empty'} | "
+    # Log
+    logger.info(f"🌍 map={len(game_state['map'])}x{len(game_state['map'][0]) if game_state['map'] else 0} | "
                f"bombers={len(game_state['bombers'])} | bombs={len(game_state['bombs'])} | "
-               f"items={len(game_state['items'])} | chests={len(game_state['chests'])} | "
-               f"my_uid={game_state['my_uid']} | started={is_start}")
-    logger.info(f"🗺️ BẢN ĐỒ BAN ĐẦU: items={len(item_tile_map)}, chests={len(chest_tile_map)}")
+               f"items={len(game_state['items'])} | chests={len(game_state['chests'])}")
     
-    # Vẽ map ban đầu
     log_map_state(game_state, log_enabled=True)
-
-    # Khởi tạo fast_state (bitmask) để AI dùng hiệu năng cao
+    
+    # Init fast_state
     try:
         fast_init_from_user(data or {})
     except Exception as e:
@@ -159,61 +131,32 @@ def handle_start(data: Dict[str, Any]):
     logger.info(f"🟢 Ô của tôi: {get_my_cell()}")
 
 def handle_finish(data: Dict[str, Any]):
-    """Xử lý sự kiện kết thúc game - Reset toàn bộ để sẵn sàng game mới"""
-    logger.info("🔴 Game KẾT THÚC - Reset toàn bộ state")
+    """Xử lý sự kiện kết thúc game"""
+    logger.info("🔴 Game KẾT THÚC")
     
-    # === RESET BOMB TRACKER TRƯỚC ===
-    try:
-        from .models.bomb_tracker import get_bomb_tracker
-        bomb_tracker = get_bomb_tracker()
-        bomb_tracker.clear()
-        logger.info("🎯 BOMB TRACKER RESET: Đã xóa toàn bộ bombs")
-    except Exception as e:
-        logger.error(f"❌ Lỗi reset Bomb Tracker: {e}")
+    _reset_bomb_tracker()
     
-    # Reset toàn bộ game state
     game_state.update({
-        "game_started": False,
-        "map": [],
-        "bombers": [],
-        "bombs": [],
-        "items": [],
-        "chests": [],
-        "last_bomb_explosions": [],
-        "active_bombs": [],
-        "explosion_history": [],
-        "chest_tile_map": {},
-        "item_tile_map": {},
-        "bomb_tile_map": {},
-        "wall_tile_map": {}
+        "game_started": False, "map": [], "bombers": [], "bombs": [], "items": [], "chests": [],
+        "last_bomb_explosions": [], "active_bombs": [], "explosion_history": [],
+        "chest_tile_map": {}, "item_tile_map": {}, "bomb_tile_map": {}, "wall_tile_map": {}
     })
     
-    # Reset FastGameState
     try:
         from .game_state import reset_fast_state
         reset_fast_state()
-        logger.info("🔄 FAST STATE RESET: Đã reset FastGameState")
     except Exception as e:
-        logger.error(f"❌ Lỗi reset FastGameState: {e}")
+        logger.error(f"❌ reset FastGameState: {e}")
     
-    # Reset AI state
-    try:
-        from .survival_ai import survival_ai
-        if survival_ai:
-            survival_ai.reset_state()
-            logger.info("🔄 AI RESET: Đã reset toàn bộ AI state")
-    except Exception as e:
-        logger.error(f"❌ Lỗi reset AI: {e}")
+    _reset_ai_state()
     
-    # Reset toàn bộ global state
     try:
         from .main import reset_global_state
         reset_global_state()
-        logger.info("🔄 GLOBAL RESET: Đã reset toàn bộ global state")
     except Exception as e:
-        logger.error(f"❌ Lỗi reset global state: {e}")
+        logger.error(f"❌ reset global: {e}")
     
-    logger.info("✅ RESET HOÀN THÀNH: Sẵn sàng cho game mới")
+    logger.info("✅ RESET HOÀN THÀNH")
 
 def handle_player_move(data: Dict[str, Any]):
     """Xử lý cập nhật di chuyển player"""
@@ -243,106 +186,68 @@ def handle_player_move(data: Dict[str, Any]):
 def handle_new_bomb(data: Dict[str, Any]):
     """Xử lý đặt bom mới"""
     bomb_id = data.get("id")
-    
     if LOG_BOMB_EVENTS:
-        logger.info(f"💣 BOM MỚI: id={bomb_id} owner={data.get('ownerName')} pos=({data.get('x')},{data.get('y')})")
+        logger.info(f"💣 BOM MỚI: {bomb_id} tại ({data.get('x')},{data.get('y')})")
     
-    # Cập nhật hoặc thêm bom
+    # Update bombs list
     for i, bomb in enumerate(game_state["bombs"]):
         if bomb.get("id") == bomb_id:
             game_state["bombs"][i] = data
             break
     else:
         game_state["bombs"].append(data)
-    
-    # Thêm bom vào danh sách bom hoạt động
     game_state["active_bombs"].append(data)
     
-    # Cập nhật bomb_tile_map
-    bomb_x, bomb_y = data.get("x", 0), data.get("y", 0)
-    tile_x = int(bomb_x // 40)
-    tile_y = int(bomb_y // 40)
-    bomb_tile_map = game_state.get("bomb_tile_map", {})
-    bomb_tile_map[(tile_x, tile_y)] = True
-    game_state["bomb_tile_map"] = bomb_tile_map
-    logger.info(f"🗺️ THÊM BOM tile=({tile_x}, {tile_y})")
+    # Update bomb tile map
+    tile_x, tile_y = _to_tile(data.get("x", 0), data.get("y", 0))
+    game_state.setdefault("bomb_tile_map", {})[(tile_x, tile_y)] = True
     
-    # === THÊM VÀO BOMB TRACKER ===
+    # Add to bomb tracker
     try:
         from .models.bomb_tracker import get_bomb_tracker
         from .game_state import get_bomber_explosion_range
         
-        bomb_tracker = get_bomb_tracker()
-        
-        # Lấy thông tin bom
         bomb_uid = data.get("uid", "")
-        explosion_range = 2  # Default
-        if bomb_uid:
-            explosion_range = get_bomber_explosion_range(bomb_uid)
+        explosion_range = get_bomber_explosion_range(bomb_uid) if bomb_uid else 2
         
-        created_at = data.get("createdAt", time.time() * 1000)
-        lifetime = data.get("lifeTime", 5000.0)
-        
-        # Add vào tracker (0-indexed position - map 16x16)
-        bomb_tracker.add_bomb(
-            bomb_id=bomb_id,
-            position=(tile_x, tile_y),
-            explosion_range=explosion_range,
-            created_at=created_at,
-            lifetime=lifetime,
-            owner_uid=bomb_uid
+        get_bomb_tracker().add_bomb(
+            bomb_id=bomb_id, position=(tile_x, tile_y), explosion_range=explosion_range,
+            created_at=data.get("createdAt", time.time() * 1000),
+            lifetime=data.get("lifeTime", 5000.0), owner_uid=bomb_uid
         )
-        
-        logger.info(f"🎯 BOMB TRACKER: Đã track bom {bomb_id} tại ({tile_x}, {tile_y}), tầm nổ={explosion_range}")
-        
     except Exception as e:
-        logger.exception(f"Bomb tracker add error: {e}")
+        logger.exception(f"Bomb tracker error: {e}")
     
-    # Vẽ lại map sau khi đặt bom
     log_map_state(game_state, log_enabled=True)
-
-    # Cập nhật FastState
+    
     try:
         fast_handle_new_bomb(data or {})
     except Exception as e:
-        logger.exception(f"FastState new_bomb error: {e}")
+        logger.exception(f"FastState error: {e}")
     
-    # === CHECK PATH HIỆN TẠI CÓ VƯỚNG BOM KHÔNG ===
-    # Nếu đang có movement plan, check xem path có đi qua blast zone không
+    # Check path intersects bomb blast
     try:
         from .main import movement_plan
-        from .game_state import get_bomber_explosion_range
+        from .helpers.escape_planner import EscapePlanner
+        from .survival_ai import survival_ai
         
-        if movement_plan.get("path_valid") and movement_plan.get("path"):
-            # Tính blast zone của bom mới
-            bomb_uid = data.get("uid")
-            explosion_range = 2  # Default
-            if bomb_uid:
-                explosion_range = get_bomber_explosion_range(bomb_uid)
+        # QUAN TRỌNG: Không reset plan nếu đây là BOM CỦA MÌNH và đang escape!
+        is_my_bomb = (data.get("uid") == game_state.get("my_uid"))
+        is_escaping = (survival_ai and survival_ai.must_escape_bomb)
+        
+        if is_my_bomb and is_escaping:
+            logger.info(f"✅ BOM CỦA MÌNH - GIỮ ESCAPE PLAN!")
+        elif movement_plan.get("path_valid") and movement_plan.get("path"):
+            explosion_range = get_bomber_explosion_range(data.get("uid")) if data.get("uid") else 2
+            blast_zone = EscapePlanner._calculate_blast_zone((tile_x + 1, tile_y + 1), explosion_range)
             
-            # Tính blast zone (dùng logic đúng spec)
-            from .helpers.escape_planner import EscapePlanner
-            blast_zone = EscapePlanner._calculate_blast_zone(
-                (tile_x + 1, tile_y + 1),  # Convert về 1-indexed
-                explosion_range
-            )
-            
-            # Check path hiện tại có vướng blast zone không
-            path = movement_plan.get("path", [])
-            path_intersects_blast = any(cell in blast_zone for cell in path)
-            
-            if path_intersects_blast:
-                logger.warning(f"⚠️ PATH VƯỚNG BOM! Reset plan ngay")
-                movement_plan["path_valid"] = False
-                movement_plan["path"] = []
-                movement_plan["orient"] = None
-                
-                # Reset AI plan nếu có
-                from .survival_ai import survival_ai
+            if any(cell in blast_zone for cell in movement_plan.get("path", [])):
+                logger.warning(f"⚠️ PATH VƯỚNG BOM! Reset plan")
+                movement_plan.update({"path_valid": False, "path": [], "orient": None})
                 if survival_ai:
                     survival_ai.current_plan = None
     except Exception as e:
-        logger.exception(f"Check path blast error: {e}")
+        logger.exception(f"Check path error: {e}")
 
 def handle_bomb_explode(data: Dict[str, Any]):
     """Xử lý bom nổ"""
@@ -567,7 +472,7 @@ def handle_item_collected(data: Dict[str, Any]):
             if b.get("uid") == bomber.get("uid"):
                 game_state["bombers"][i] = bomber
                 break
-        logger.info(f"💎 NHẶT ITEM: {item.get('type')} - Tốc độ: {bomber.get('speed')} - SPEED items: {bomber.get('speedCount')}")
+        logger.info(f"💎 NHẶT ITEM: {item.get('type')} - Tốc độ hiện tại: {bomber.get('speed')} (max 3) - Số item speed: {bomber.get('speedCount')} (mỗi item = 10 điểm)")
     
     # Vẽ lại map sau khi nhặt item
     log_map_state(game_state, log_enabled=True)

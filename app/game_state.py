@@ -206,10 +206,16 @@ def get_bomber_explosion_range(uid: str) -> int:
     return 2  # Tầm nổ mặc định
 
 def get_bomber_speed(uid: str) -> int:
-    """Lấy tốc độ của bot (1, 2, hoặc 3) - số pixel mỗi bước"""
+    """
+    Lấy tốc độ HIỆN TẠI của bot (1, 2, hoặc 3) - số pixel mỗi bước
+    
+    Note: 
+    - speed: Tốc độ hiện tại (tối đa 3, dù ăn bao nhiêu item speed)
+    - speedCount: Số lượng item speed đã nhặt (không giới hạn, mỗi item = 10 điểm)
+    """
     bomber = get_bomber_by_uid(uid)
     if bomber and isinstance(bomber.get("speed"), (int, float)):
-        # Theo format từ server: speed = 1, 2, 3
+        # Tốc độ từ server, giới hạn 1-3
         return min(3, max(1, int(bomber["speed"])))
     return 1
 
