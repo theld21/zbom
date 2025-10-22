@@ -500,7 +500,7 @@ class SimpleSurvivalAI:
                 return self._execute_long_term_plan(long_term_plan, current_cell, current_time, can_place_bomb)
         else:
             # Đang có plan cũ - tiếp tục thực hiện
-            logger.info(f"🔄 TIẾP TỤC PLAN CŨ: {self.current_plan.get('type')} → {self.current_plan.get('goal_cell')}")
+            logger.debug(f"🔄 TIẾP TỤC PLAN CŨ: {self.current_plan.get('type')} → {self.current_plan.get('goal_cell')}")
             return self._execute_long_term_plan(self.current_plan, current_cell, current_time, can_place_bomb)
         
         # 1.6. ƯU TIÊN ĐẶT BOM LIÊN TỤC - Sau khi bom nổ

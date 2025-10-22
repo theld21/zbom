@@ -20,7 +20,7 @@ from .config import (
     SOCKET_SERVER, TOKEN, TICK_HZ, MAX_CMDS_PER_SEC, CELL_SIZE, LOG_LEVEL, BOT_NAME,
     REVERSE_LOCK_SECONDS, DIRECTIONS, LOG_MOVEMENT, LOG_MAP
 )
-from .game_state import game_state, can_send_command, get_my_bomber, pos_to_cell
+from .game_state import game_state, get_my_bomber, pos_to_cell
 from .survival_ai import choose_next_action
 from .socket_handlers import (
     handle_connect, handle_disconnect, handle_user, handle_start, 
@@ -227,9 +227,6 @@ async def send_move(orient: str):
     """Gửi lệnh di chuyển với giới hạn tốc độ"""
     if orient not in DIRECTIONS:
         return
-    if not can_send_command():
-        logger.warning(f"🚫 KHÔNG THỂ DI CHUYỂN: Quá giới hạn tốc độ")
-        return
     
     if not game_state.get("game_started", False):
         if os.getenv("ENVIRONMENT", "prod") != "dev":
@@ -237,6 +234,7 @@ async def send_move(orient: str):
             return
     
     try:
+        # cmd_limiter đã đảm bảo rate limiting (58 cmd/s)
         async with cmd_limiter:
             await sio.emit("move", {"orient": orient}, callback=_ack_logger("move"))
         movement_logger.log_movement(orient, LOG_MOVEMENT)
@@ -245,10 +243,6 @@ async def send_move(orient: str):
 
 async def send_bomb():
     """Gửi lệnh đặt bom"""
-    if not can_send_command():
-        logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Quá giới hạn tốc độ")
-        return
-    
     # Kiểm tra bot có thể di chuyển không
     me = get_my_bomber()
     # if me and not me.get("movable", True):
@@ -266,6 +260,7 @@ async def send_bomb():
             return
     
     try:
+        # cmd_limiter đã đảm bảo rate limiting (58 cmd/s)
         async with cmd_limiter:
             await sio.emit("place_bomb", {}, callback=_ack_logger("place_bomb"))
         logger.info(f"💣 ĐẶT BOM")
@@ -303,6 +298,11 @@ async def bot_loop():
     period = 1.0 / max(TICK_HZ, 1.0)
     
     while True:
+        # Kiểm tra game đã bắt đầu chưa
+        if not game_state.get("game_started", False):
+            await asyncio.sleep(0.5)
+            continue
+        
         start_time = time.time()
         try:
             # Kiểm tra trạng thái bot
@@ -386,23 +386,31 @@ async def bot_loop():
                     if time.time() - completed_time < 1.0:
                         # CHỈ đặt bom khi plan là bomb_chest, không đặt bom khi plan là collect_item
                         if not movement_plan.get("bomb_placed"):
-                            from .survival_ai import survival_ai
-                            current_plan = survival_ai.current_plan
+                            # Lấy plan_type đã lưu trong movement_plan (thay vì survival_ai.current_plan có thể bị clear)
+                            plan_type = movement_plan.get("plan_type")
                             
-                            if current_plan and current_plan.get("type") == "bomb_chest":
+                            if plan_type == "bomb_chest":
                                 me = get_my_bomber()
                                 if me:
                                     current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
-                                    logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell}")
+                                    # CHỈ log 1 lần duy nhất
+                                    if not movement_plan.get("logged_bomb_action"):
+                                        logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell}")
+                                        movement_plan["logged_bomb_action"] = True
                                     await send_bomb()
                                     movement_plan["bomb_placed"] = True
                             else:
-                                logger.info(f"✅ PATH HOÀN THÀNH - KHÔNG ĐẶT BOM: Plan type = {current_plan.get('type') if current_plan else 'None'}")
+                                # CHỈ log 1 lần duy nhất
+                                if not movement_plan.get("logged_bomb_action"):
+                                    logger.info(f"✅ PATH HOÀN THÀNH - KHÔNG ĐẶT BOM: Plan type = {plan_type}")
+                                    movement_plan["logged_bomb_action"] = True
                         await asyncio.sleep(period)
                         continue
                     else:
                         movement_plan.pop("just_completed", None)
                         movement_plan.pop("bomb_placed", None)
+                        movement_plan.pop("logged_bomb_action", None)
+                        movement_plan.pop("plan_type", None)
                 
                 # Đặt bom ngay khi đến đích (trước khi chạy tiếp)
                 if movement_plan.get("need_bomb_at_target"):
@@ -457,7 +465,15 @@ async def bot_loop():
                     
                     # Không có plan: hỏi AI
                     if not movement_plan.get("just_completed"):
+                        # Lấy current_plan TRƯỚC khi choose_next_action (có thể bị clear bên trong)
+                        from .survival_ai import survival_ai
+                        current_plan_type = survival_ai.current_plan.get("type") if survival_ai.current_plan else None
+                        
                         action = choose_next_action()
+                        
+                        # Lưu plan_type từ current_plan vào action (nếu có)
+                        if action and current_plan_type and action.get("type") == "move":
+                            action["plan_type"] = current_plan_type
                     
                     if action is None:
                         global _last_ai_idle_time
@@ -485,6 +501,9 @@ async def bot_loop():
                             goal_cell = action.get("goal_cell")
                             if goal_cell:
                                 movement_planner.plan_path(goal_cell)
+                                # Lưu plan_type từ action vào movement_plan để dùng khi hoàn thành path
+                                if action.get("plan_type"):
+                                    movement_plan["plan_type"] = action["plan_type"]
                                 direction = movement_planner.get_next_direction()
                                 if direction:
                                     await _maybe_emit_move(direction)
@@ -558,6 +577,11 @@ async def connect_and_start_bot():
         except Exception as e:
             logger.error(f"Kết nối thất bại: {e}; thử lại sau 3s")
             await asyncio.sleep(3)
+    
+    # Kiểm tra môi trường dev và bật game_started
+    if os.getenv("ENVIRONMENT", "prod") == "dev":
+        game_state["game_started"] = True
+        logger.info("🔧 MÔI TRƯỜNG DEV TỰ CHẠY BOT")
     
     # Bắt đầu vòng lặp bot
     bot_task = asyncio.create_task(bot_loop())

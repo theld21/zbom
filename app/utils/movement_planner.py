@@ -39,6 +39,9 @@ class MovementPlanner:
         self.plan["long_term_goal"] = None
         self.plan["path_valid"] = False
         self.plan.pop("just_completed", None)
+        self.plan.pop("bomb_placed", None)
+        self.plan.pop("logged_bomb_action", None)
+        self.plan.pop("plan_type", None)
         self.oscillation_detector = []
         
     def detect_oscillation(self, direction: str) -> bool:

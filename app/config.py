@@ -9,22 +9,22 @@ import os
 SOCKET_SERVER = os.getenv("SOCKET_SERVER", "http://localhost:3000")
 TOKEN = os.getenv("TOKEN", "DEV_TOKEN")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-TICK_HZ = float(os.getenv("TICK_HZ", "96"))  # Nhịp vòng lặp AI
+TICK_HZ = float(os.getenv("TICK_HZ", "64"))  # Nhịp vòng lặp AI (tối ưu: 64Hz ≈ 15.6ms/tick, khớp với 58 cmd/s ≈ 17.2ms/cmd)
 MAX_CMDS_PER_SEC = float(os.getenv("MAX_CMDS_PER_SEC", "58"))  # Giới hạn lệnh move/s
 BOT_NAME = os.getenv("BOT_NAME", "Docker")
 
 # ---------- Config Log ----------
-LOG_MOVEMENT = os.getenv("LOG_MOVEMENT", "true").lower() == "true"
-LOG_ITEMS = os.getenv("LOG_ITEMS", "false").lower() == "true"
-LOG_BOMBS = os.getenv("LOG_BOMBS", "false").lower() == "true"
-LOG_CHESTS = os.getenv("LOG_CHESTS", "false").lower() == "true"
-LOG_MAP = os.getenv("LOG_MAP", "true").lower() == "true"
-LOG_AI = os.getenv("LOG_AI", "true").lower() == "true"
-LOG_SOCKET = os.getenv("LOG_SOCKET", "false").lower() == "true"
-LOG_GAME_EVENTS = os.getenv("LOG_GAME_EVENTS", "true").lower() == "true"
-LOG_ITEM_COLLECTION = os.getenv("LOG_ITEM_COLLECTION", "false").lower() == "true"
-LOG_BOMB_EVENTS = os.getenv("LOG_BOMB_EVENTS", "true").lower() == "true"
-LOG_ARRIVAL_CHECK = os.getenv("LOG_ARRIVAL_CHECK", "true").lower() == "true"
+LOG_MOVEMENT = True
+LOG_ITEMS = False
+LOG_BOMBS = False
+LOG_CHESTS = False
+LOG_MAP = True
+LOG_AI = True
+LOG_SOCKET = False
+LOG_GAME_EVENTS = True
+LOG_ITEM_COLLECTION = False
+LOG_BOMB_EVENTS = True
+LOG_ARRIVAL_CHECK = True
 
 # ---------- Hằng số game ----------
 # Kích thước map (theo spec: 640x640 px)
