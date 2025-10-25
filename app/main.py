@@ -32,7 +32,7 @@ from .socket_handlers import (
 
 # Import utils
 from .utils.loggers import MovementLogger, log_map_state
-from .utils.movement_planner import get_movement_planner
+from .movement import get_movement_planner
 from .bot_controller import get_bot_controller
 
 # Giới hạn tốc độ gửi lệnh
@@ -340,7 +340,7 @@ async def bot_loop():
                 if did_progress:
                     await asyncio.sleep(period)
                     continue
-                    
+                
                 # Clear plan nếu hoàn thành
                 if not movement_plan["path_valid"] or not movement_plan["path"]:
                     if not movement_plan.get("bomb_placed"):
@@ -357,17 +357,19 @@ async def bot_loop():
                 if did_progress:
                     await asyncio.sleep(period)
                     continue
+            else:
+                # Không có action → KHÔNG sleep, lặp lại ngay để hỏi AI liên tục
+                # cho đến khi có action mới (sau khi hoàn thành plan)
+                await asyncio.sleep(0.05)  # Sleep rất ngắn để tránh spam CPU
+                continue
             
-            # 9. Fallback: random move
-            for orient in ["UP", "DOWN", "LEFT", "RIGHT"]:
-                if controller.can_emit_move_now(MAX_CMDS_PER_SEC):
-                    await _send_move(orient)
-                    break
-            
+            # 9. Không có fallback random - Bot sẽ đợi survival_ai tạo plan mới
+            # (Xóa fallback random để tránh bot đi lung tung khi plan bị reset)
+                
         except Exception as e:
             logger.exception(f"❌ Lỗi bot loop: {e}")
-        
-        await asyncio.sleep(period)
+            
+            await asyncio.sleep(period)
 
 # ---------- Startup ----------
 async def startup():

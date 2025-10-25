@@ -228,7 +228,7 @@ def handle_new_bomb(data: Dict[str, Any]):
     # Check path intersects bomb blast
     try:
         from .main import movement_plan
-        from .helpers.escape_planner import EscapePlanner
+        import app.pathfinding as pathfinding
         from .survival_ai import survival_ai
         
         # QUAN TRỌNG: Không reset plan nếu đây là BOM CỦA MÌNH và đang escape!
@@ -239,7 +239,7 @@ def handle_new_bomb(data: Dict[str, Any]):
             logger.info(f"✅ BOM CỦA MÌNH - GIỮ ESCAPE PLAN!")
         elif movement_plan.get("path_valid") and movement_plan.get("path"):
             explosion_range = get_bomber_explosion_range(data.get("uid")) if data.get("uid") else 2
-            blast_zone = EscapePlanner._calculate_blast_zone((tile_x + 1, tile_y + 1), explosion_range)
+            blast_zone = pathfinding.calculate_blast_zone((tile_x + 1, tile_y + 1), explosion_range)
             
             if any(cell in blast_zone for cell in movement_plan.get("path", [])):
                 logger.warning(f"⚠️ PATH VƯỚNG BOM! Reset plan")
@@ -653,7 +653,7 @@ def handle_new_life(data: Dict[str, Any]):
                 logger.info(f"🔄 RESET AI STATE: Đã reset toàn bộ AI state")
             
             # Reset movement plan trong movement_planner.py
-            from .utils.movement_planner import get_movement_planner
+            from .movement import get_movement_planner
             movement_planner = get_movement_planner()
             movement_planner.reset()
             logger.info(f"🔄 RESET MOVEMENT PLAN: Đã reset movement plan sau khi hồi sinh")

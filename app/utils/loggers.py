@@ -1,104 +1,67 @@
-"""
-Loggers - Gộp map_logger và movement_logger
-"""
-
+"""Loggers - Movement logging and map logging"""
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-
-def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True, force: bool = False):
-    """Log trạng thái bản đồ trước khi phân tích plan"""
-    if not log_enabled and not force:
-        return
-        
-    try:
-        from ..game_state import get_my_bomber, pos_to_cell
-        
-        map_data = game_state.get("map", [])
-        if isinstance(map_data, dict):
-            tiles = map_data.get("tiles", [])
-        else:
-            tiles = map_data if isinstance(map_data, list) else []
-        
-        bombs = game_state.get("bombs", [])
-        items = game_state.get("items", [])
-        chests = game_state.get("chests", [])
-        
-        me = get_my_bomber()
-        bot_cell = None
-        if me:
-            bot_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
-        
-        logger.info("=" * 50)
-        logger.info("🗺️  MAP STATE")
-        logger.info(f"Map size: {len(tiles)}x{len(tiles[0]) if tiles else 0}")
-        logger.info(f"Bot: {bot_cell}")
-        logger.info(f"Bombs: {len(bombs)}, Items: {len(items)}, Chests: {len(chests)}")
-        
-        if bombs:
-            bomb_cells = [pos_to_cell(b.get("x", 0), b.get("y", 0)) for b in bombs[:3]]
-            logger.info(f"Bomb cells: {bomb_cells}")
-        
-        if chests:
-            chest_cells = [pos_to_cell(c.get("x", 0), c.get("y", 0)) for c in chests[:5]]
-            logger.info(f"Chest cells: {chest_cells}")
-        
-        logger.info("=" * 50)
-    except Exception as e:
-        logger.error(f"❌ Lỗi log map: {e}")
-
-
 class MovementLogger:
-    """Hệ thống log di chuyển đơn giản"""
+    """Movement logger with cell arrival tracking"""
     
     def __init__(self):
-        self.current_direction: Optional[str] = None
-        self.last_logged_cell: Optional[Tuple[int, int]] = None
-        
-    def log_movement(self, direction: str, log_enabled: bool = True):
-        """Log di chuyển - chỉ log khi thay đổi hướng"""
+        self.last_cell = None
+        self.last_log_time = 0
+    
+    def check_and_log_cell_arrival(self, log_enabled: bool = True):
+        """Check and log when bot arrives at a new cell"""
         if not log_enabled:
             return
-            
-        if self.current_direction != direction:
-            self.current_direction = direction
-            
+        
+        try:
             from ..game_state import get_my_bomber, pos_to_cell
             
             me = get_my_bomber()
-            if me:
-                px, py = me.get("x", 0), me.get("y", 0)
-                current_cell = pos_to_cell(px, py)
-                logger.info(f"🚶 DI CHUYỂN: pixel({px:.1f},{py:.1f}) tile{current_cell} → {direction}")
-            else:
-                logger.info(f"🚶 DI CHUYỂN: {direction}")
+            if not me:
+                return
+            
+            # Sử dụng pos_to_cell để có tọa độ chính xác (bao gồm .5)
+            current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
+            
+            # Chỉ log khi bot ở chính xác ô (số nguyên), không log khi ở giữa cell (.5)
+            is_exact = (current_cell[0] % 1.0 == 0.0 and current_cell[1] % 1.0 == 0.0)
+            
+            if is_exact and current_cell != self.last_cell:
+                # Convert sang int để log đẹp hơn
+                cell_int = (int(current_cell[0]), int(current_cell[1]))
+                logger.info(f"📍 ĐẾN Ô MỚI: {cell_int}")
+                self.last_cell = current_cell
+        except Exception as e:
+            logger.error(f"Error checking cell arrival: {e}")
     
-    def check_and_log_cell_arrival(self, log_enabled: bool = True):
-        """Kiểm tra và log khi bot vào ô mới"""
+    def log_movement(self, orient: str, log_enabled: bool = True):
+        """Log movement"""
         if not log_enabled:
             return
-            
-        from ..game_state import get_my_bomber, pos_to_cell, is_at_exact_cell
-        
-        me = get_my_bomber()
-        if not me:
+        logger.info(f"➡️ MOVE: {orient}")
+    
+    @staticmethod
+    def log_move(orient: str, current_pos: tuple, target_pos: tuple):
+        """Log movement with positions"""
+        logger.info(f"MOVE {orient}: {current_pos} → {target_pos}")
+
+def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True):
+    """Log map state"""
+    from ..config import LOG_MAP
+    if not LOG_MAP or not log_enabled:
+        return
+    
+    try:
+        mp = game_state.get("map", [])
+        if not mp:
             return
         
-        px, py = me.get("x", 0), me.get("y", 0)
-        current_cell = pos_to_cell(px, py)
-        
-        if is_at_exact_cell(px, py) and current_cell != self.last_logged_cell:
-            logger.info(f"📍 VÀO Ô: pixel({px:.1f},{py:.1f}) → tile{current_cell}")
-            self.last_logged_cell = current_cell
-    
-    def reset(self):
-        """Reset logger state"""
-        self.current_direction = None
-        self.last_logged_cell = None
-    
-    def flush(self):
-        """Placeholder for compatibility"""
-        pass
-
+        logger.info("=== MAP ===")
+        for row in mp:
+            logger.info(" ".join(str(cell) if cell else "." for cell in row))
+        logger.info("===========")
+    except Exception as e:
+        logger.error(f"Error logging map: {e}")

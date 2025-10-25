@@ -1,8 +1,4 @@
-"""
-Utility modules
-"""
+"""Utils modules"""
+from .loggers import MovementLogger, log_map_state
 
-from .loggers import log_map_state, MovementLogger
-from .movement_planner import MovementPlanner, get_movement_planner
-
-__all__ = ["log_map_state", "MovementLogger", "MovementPlanner", "get_movement_planner"]
+__all__ = ["MovementLogger", "log_map_state"]

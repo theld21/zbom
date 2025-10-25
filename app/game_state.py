@@ -408,7 +408,8 @@ class FastGameState:
         mask |= (self.dynamic.hazard_until > self.tick).astype(np.uint8) * HAZARD_MASK
         # items
         for (x, y), _t in self.dynamic.items.items():
-            mask[y, x] |= ITEM_MASK
+            # QUAN TRỌNG: Convert float to int để dùng làm array index!
+            mask[int(y), int(x)] |= ITEM_MASK
         # bots
         for ag in self.agents.values():
             if ag.alive and self.static.in_bounds(ag.pos[0], ag.pos[1]):
@@ -629,10 +630,11 @@ def _compute_explosion_tiles(center: Pos, flame: int) -> List[Pos]:
     fs = get_fast_state()
     if not fs.static:
         return []
-    tiles: List[Pos] = [center]
+    # QUAN TRỌNG: Convert center to int để tránh float trong array indexing!
+    cx, cy = int(center[0]), int(center[1])
+    tiles: List[Pos] = [(cx, cy)]
     # Dùng base_mask để kiểm tra vật cản
     base = fs.static.base_mask
-    cx, cy = center
     for dx, dy in NEIGHBORS:
         x, y = cx, cy
         for _ in range(flame):

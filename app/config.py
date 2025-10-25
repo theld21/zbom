@@ -10,13 +10,13 @@ MAX_CMDS_PER_SEC = float(os.getenv("MAX_CMDS_PER_SEC", "58"))  # Giới hạn l�
 BOT_NAME = os.getenv("BOT_NAME", "Docker")
 
 # ---------- Config Log ----------
-LOG_MOVEMENT = True
+LOG_MOVEMENT = False
 LOG_MAP = True
 LOG_SOCKET = False
 LOG_GAME_EVENTS = True
 LOG_ITEM_COLLECTION = False
-LOG_BOMB_EVENTS = True
-LOG_ARRIVAL_CHECK = True
+LOG_BOMB_EVENTS = False
+LOG_ARRIVAL_CHECK = False
 
 # ---------- Hằng số game ----------
 # Kích thước map (theo spec: 640x640 px)
