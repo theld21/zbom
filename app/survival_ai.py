@@ -845,10 +845,11 @@ class SimpleSurvivalAI:
         best_score = -1
         
         # Tìm hướng di chuyển xa khỏi bot khác nhất
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for direction in ["UP", "DOWN", "LEFT", "RIGHT"]:
             dx, dy = DIRECTIONS[direction]
-            next_cell = (current_cell[0] + dx, current_cell[1] + dy)
-            
+            next_cell = (current_cell_int[0] + dx, current_cell_int[1] + dy)
+
             if not self._is_cell_passable(next_cell):
                 continue
                 

@@ -11,9 +11,9 @@ BOT_NAME = os.getenv("BOT_NAME", "Docker")
 
 # ---------- Config Log ----------
 LOG_MOVEMENT = False
-LOG_MAP = True
+LOG_MAP = False
 LOG_SOCKET = False
-LOG_GAME_EVENTS = True
+LOG_GAME_EVENTS = False
 LOG_ITEM_COLLECTION = False
 LOG_BOMB_EVENTS = False
 LOG_ARRIVAL_CHECK = False
