@@ -18,9 +18,14 @@ RUN groupadd -r bomber && useradd -r -g bomber bomber
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies with retry and increased timeout
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip first for better timeout handling (using Vietnam mirror)
+RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+# Install with increased timeout and retries (using Vietnam mirror)
+RUN pip install --no-cache-dir --timeout=600 --retries=10 \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    -r requirements.txt
 
 # Copy app code and entry point
 COPY app/ ./app/
