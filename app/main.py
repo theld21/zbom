@@ -54,15 +54,6 @@ sio = socketio.AsyncClient(
     engineio_logger=False
 )
 
-# ---------- Ack logging helpers ----------
-def _ack_logger(event_name: str):
-    def _cb(res=None):
-        try:
-            logger.info(f"ACK {event_name}: {res}")
-        except Exception:
-            pass
-    return _cb
-
 # Đã chuyển sang BotController
 
 @asynccontextmanager
@@ -75,14 +66,11 @@ async def lifespan(app: FastAPI):
         logger.setLevel(level)
     except Exception:
         pass
-    logger.info("🚀 Khởi động bot...")
     try:
         await startup()
-        logger.info("🚀 Bot đã sẵn sàng")
     except Exception as e:
-        logger.error(f"🚀 Lỗi khởi động: {e}")
+        pass
     yield
-    logger.info("🚀 Bot đã dừng")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -109,7 +97,6 @@ async def get_state():
         "items": len(game_state.get("items", [])),
         "chests": len(game_state.get("chests", [])),
     }
-
 
 # ---------- Socket Event Handlers ----------
 @sio.event
@@ -208,12 +195,11 @@ async def send_move(orient: str):
     
     if not game_state.get("game_started", False):
         if os.getenv("ENVIRONMENT", "prod") != "dev":
-            logger.warning(f"🚫 KHÔNG THỂ DI CHUYỂN: Game chưa bắt đầu - {orient}")
             return
     
     try:
         async with cmd_limiter:
-            await sio.emit("move", {"orient": orient}, callback=_ack_logger("move"))
+            await sio.emit("move", {"orient": orient})
         movement_logger.log_movement(orient, LOG_MOVEMENT)
     except Exception as e:
         logger.error(f"❌ Lỗi di chuyển: {e}")
@@ -224,15 +210,13 @@ async def send_bomb():
     if not game_state.get("game_started", False):
         # Trong môi trường dev, cho phép đặt bom mà không cần start event
         if os.getenv("ENVIRONMENT", "prod") == "dev":
-            logger.info(f"💣 CHẾ ĐỘ DEV: Cho phép đặt bom mà không cần start event")
+            pass
         else:
-            logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM: Game chưa bắt đầu - chờ start event")
             return
     
     try:
         async with cmd_limiter:
-            await sio.emit("place_bomb", {}, callback=_ack_logger("place_bomb"))
-        logger.info(f"💣 ĐẶT BOM")
+            await sio.emit("place_bomb", {})
         
         # Cập nhật số bom local
         my_uid = game_state.get("my_uid")
@@ -251,7 +235,6 @@ def reset_global_state() -> None:
     controller.reset()
     movement_planner.reset()
     movement_logger.reset()
-    logger.info("🔄 GLOBAL RESET: Đã reset toàn bộ global state")
 
 async def _send_move(orient: str):
     """Helper để gửi move với rate limiting"""
@@ -264,7 +247,6 @@ async def _send_move(orient: str):
 async def _try_find_bot():
     """Helper để tìm lại bot"""
     available = [b.get('name') for b in game_state.get('bombers', [])]
-    logger.warning(f"🔍 Không tìm thấy bot! Có: {available}")
     
     if available:
         game_state["my_uid"] = None
@@ -273,12 +255,10 @@ async def _try_find_bot():
                     b["name"].lower() == BOT_NAME.lower()), None)
         if mine:
             game_state["my_uid"] = mine.get("uid")
-            logger.info(f"🤖 CHỌN LẠI: {mine.get('name')} ({game_state['my_uid']})")
         else:
             uids = [b.get("uid") for b in game_state.get("bombers", [])]
             if uids:
                 game_state["my_uid"] = game_state["bombers"][0].get("uid")
-                logger.info(f"🤖 FALLBACK: {game_state['bombers'][0].get('name')}")
 
 async def bot_loop():
     """Vòng lặp quyết định - ĐƠN GIẢN HÓA"""
@@ -345,7 +325,6 @@ async def bot_loop():
                 if not movement_plan["path_valid"] or not movement_plan["path"]:
                     if not movement_plan.get("bomb_placed"):
                         survival_ai.current_plan = None
-                        logger.info(f"✅ CLEAR PLAN: Đã hoàn thành")
             
             # 8. Hỏi AI action mới
             action = choose_next_action()

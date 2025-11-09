@@ -161,10 +161,6 @@ def is_passable(cx: int, cy: int) -> bool:
     # Kiểm tra kích thước map
     if not mp or len(mp) <= cy or len(mp[cy]) <= cx:
         # Không log warning nếu map đang được reset (sau khi hồi sinh)
-        if len(mp) == 0:
-            logger.debug(f"🗺️ MAP RESET: Map đang được reset, tạm coi ô ({cx}, {cy}) là không thể đi")
-        else:
-            logger.warning(f"⚠️ MAP SIZE ERROR: mp={len(mp)}x{len(mp[0]) if mp else 'empty'}, trying to access ({cx}, {cy})")
         return False
         
     # Convert float to int for array indexing
@@ -300,7 +296,6 @@ def has_wall_at_tile(tile_x: int, tile_y: int) -> bool:
         except (IndexError, TypeError):
             return True  # Lỗi truy cập = coi như tường
     except Exception as e:
-        logger.error(f"❌ Lỗi has_wall_at_tile: {e}")
         return True  # Lỗi = coi như tường
 
 # ==============================
@@ -445,9 +440,7 @@ class FastGameState:
                     if self.static and self.static.in_bounds(cell_x, cell_y):
                         blocked[cell_y, cell_x] = True
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.debug(f"Bomb tracker error in walkable_mask: {e}")
+                pass
         
         walkable = (blocked == 0)
         
@@ -468,7 +461,6 @@ class FastGameState:
         if v & ITEM_MASK:
             return 'I'
         return '0'
-
 
 # Fast state toàn cục (song song với game_state cũ để tương thích ngược)
 fast_state = FastGameState()
@@ -621,7 +613,6 @@ def reset_fast_state() -> None:
     fast_state._cached_walkable_mask = None
     fast_state._path_cache_tick = -1
     fast_state._path_cache.clear()
-    logger.info("🔄 FAST STATE RESET: Đã reset FastGameState")
 
 # -----------------------------
 # Dự báo vùng nổ từ bom (line-of-fire)
@@ -715,11 +706,9 @@ def bfs_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_bo
                 if 0 <= px < W and 0 <= py < H:
                     is_walkable = walkable[int(py), int(px)]
                     if not is_walkable:
-                        logger.warning(f"⚠️ PATH INVALID: ({px},{py}) không thể đi được!")
                         invalid_path = True
             
             if invalid_path:
-                logger.warning(f"⚠️ BFS PATH INVALID: Tìm được path nhưng có ô không thể đi được!")
                 fs._path_cache[cache_key] = None
                 return None
             
@@ -795,11 +784,9 @@ def astar_shortest_path(start: Pos, goal: Pos, avoid_hazard: bool = True, avoid_
                 if 0 <= px < W and 0 <= py < H:
                     is_walkable = walkable[int(py), int(px)]
                     if not is_walkable:
-                        logger.warning(f"⚠️ A* PATH INVALID: ({px},{py}) không thể đi được!")
                         invalid_path = True
             
             if invalid_path:
-                logger.warning(f"⚠️ A* PATH INVALID: Tìm được path nhưng có ô không thể đi được!")
                 fs._path_cache[cache_key] = None
                 return None
             

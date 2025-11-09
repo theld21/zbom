@@ -113,9 +113,7 @@ class SimpleSurvivalAI:
         
         # Reset vị trí theo dõi
         self._last_position = None
-        
-        logger.info(f"🔄 AI RESET: Đã reset toàn bộ trạng thái AI")
-        
+
     def _get_move_time_ms(self, my_uid: str) -> float:
         """Tính thời gian di chuyển 1 bước (ms) dựa trên tốc độ"""
         speed = get_bomber_speed(my_uid)
@@ -163,7 +161,6 @@ class SimpleSurvivalAI:
         """Lập kế hoạch chiến lược thông minh - TRÁNH VÒNG LẶP"""
         # Kiểm tra vị trí hiện tại có hợp lệ không
         if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
-            logger.warning(f"🚫 VỊ TRÍ KHÔNG HỢP LỆ: {current_cell} - Tìm vị trí an toàn gần nhất")
             # Tìm vị trí an toàn gần nhất trong map
             for radius in range(1, 8):
                 for dx in range(-radius, radius + 1):
@@ -171,7 +168,6 @@ class SimpleSurvivalAI:
                         target = (current_cell[0] + dx, current_cell[1] + dy)
                         if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                             self._is_cell_passable(target)):
-                            logger.info(f"🎯 TÌM THẤY VỊ TRÍ AN TOÀN: {target}")
                             return target
             return None
         
@@ -188,7 +184,6 @@ class SimpleSurvivalAI:
                 for goal in unexplored_safe:
                     test_path = bfs_shortest_path(current_cell_int, goal, avoid_hazard=False, avoid_bots=False)
                     if test_path and len(test_path) > 1:
-                        logger.info(f"🎯 CHỌN VÙNG AN TOÀN CHƯA THĂM (có đường): {goal}")
                         return goal
                 # logger.warning(f"⚠️ CÁC VÙNG AN TOÀN CHƯA THĂM KHÔNG CÓ ĐƯỜNG ĐI!")  # Giảm log spam
             # Nếu không có unexplored hoặc không có đường đi, thử explored
@@ -196,7 +191,6 @@ class SimpleSurvivalAI:
             for goal in safe_goals:
                 test_path = bfs_shortest_path(current_cell_int, goal, avoid_hazard=False, avoid_bots=False)
                 if test_path and len(test_path) > 1:
-                    logger.info(f"🎯 CHỌN VÙNG AN TOÀN (có đường): {goal}")
                     return goal
             # logger.warning(f"⚠️ TẤT CẢ VÙNG AN TOÀN KHÔNG CÓ ĐƯỜNG ĐI!")  # Giảm log spam
             
@@ -207,7 +201,6 @@ class SimpleSurvivalAI:
             for goal in item_goals:
                 test_path = bfs_shortest_path(current_cell_int, goal, avoid_hazard=False, avoid_bots=False)
                 if test_path and len(test_path) > 1:
-                    logger.info(f"🎯 CHỌN ITEM QUAN TRỌNG (có đường): {goal}")
                     return goal
             # logger.warning(f"⚠️ CÁC ITEM KHÔNG CÓ ĐƯỜNG ĐI!")  # Giảm log spam
             
@@ -219,18 +212,15 @@ class SimpleSurvivalAI:
             for goal in exploration_goals:
                 test_path = bfs_shortest_path(current_cell_int, goal, avoid_hazard=False, avoid_bots=False)
                 if test_path and len(test_path) > 1:
-                    logger.info(f"🎯 CHỌN KHÁM PHÁ (có đường): {goal}")
                     return goal
             # logger.warning(f"⚠️ CÁC MỤC TIÊU KHÁM PHÁ KHÔNG CÓ ĐƯỜNG ĐI!")  # Giảm log spam
         
         # 4. Fallback: Tìm ô an toàn bất kỳ (tránh vòng lặp)
         safe_goal = self._find_safe_goal(current_cell, time.time() * 1000)
         if safe_goal:
-            logger.info(f"🎯 FALLBACK AN TOÀN: {safe_goal}")
             return safe_goal
             
         # Nếu KHÔNG TÌM ĐƯỢC MỤC TIÊU NÀO → Bot bị TRAPPED
-        logger.warning(f"🚧 BOT BỊ TRAPPED tại {current_cell} - ĐỨNG YÊN CHỜ ĐƯỜNG MỞ")
         return None
     
     def _execute_long_term_plan(self, plan: Dict, current_cell: Tuple[int, int], current_time: float, can_place_bomb: bool) -> Optional[Dict[str, Any]]:
@@ -239,7 +229,6 @@ class SimpleSurvivalAI:
         plan_goal = plan.get("goal_cell")
         
         if plan_type == "collect_item":
-            logger.info(f"💎 PLAN DÀI HẠN - NHẶT VẬT PHẨM: đến {plan_goal}")
             self.last_action_time = current_time
             self._update_last_direction(current_cell, plan_goal)
             return {"type": "move", "goal_cell": plan_goal}
@@ -252,11 +241,6 @@ class SimpleSurvivalAI:
                     bomb_pos = plan_goal
                     escape_pos = plan.get("escape_cell", "chưa tính")
                     escape_path = plan.get("escape_path", [])
-                    
-                    logger.info(f"💣 PLAN DÀI HẠN - ĐẶT BOM TẠI VỊ TRÍ HIỆN TẠI")
-                    logger.info(f"🎯 PLAN CHI TIẾT: ĐẾN {bomb_pos} → ĐẶT BOM → THOÁT ĐẾN {escape_pos}")
-                    if escape_path:
-                        logger.info(f"🛡️ ĐƯỜNG THOÁT: {escape_path}")
                     
                     self.last_action_time = current_time
                     self.last_bomb_time_ms = current_time
@@ -273,9 +257,7 @@ class SimpleSurvivalAI:
                     
                     for blast_cell in blast_zone:
                         self.failed_bomb_positions[blast_cell] = current_time
-                    
-                    logger.warning(f"⚡ SET FLAG: must_escape_bomb = True + BLACKLIST {current_cell} + blast zone ({len(blast_zone)} ô)")
-                    
+
                     # QUAN TRỌNG: Trả về bomb action KÈM escape_path để bot_controller thực thi!
                     # KHÔNG XÓA current_plan ở đây! bot_controller cần nó để lấy escape_path!
                     # self.current_plan sẽ được clear sau khi escape plan được lập xong
@@ -287,14 +269,12 @@ class SimpleSurvivalAI:
                         "escape_cell": escape_pos
                     }
                 else:
-                    logger.warning(f"🚫 KHÔNG THỂ ĐẶT BOM tại {current_cell}: blacklist 5s")
                     # BLACKLIST vị trí này để tránh lặp lại - QUAN TRỌNG: Blacklist cả blast zone!
                     self._add_to_blacklist(current_cell, current_time)
                     self.current_plan = None
                     # Tìm mục tiêu khác ngay
                     fallback = self._get_fallback_action(current_cell, current_time)
                     if fallback:
-                        logger.info(f"🔄 CHUYỂN SANG MỤC TIÊU KHÁC")
                         return fallback
                     return None
             else:
@@ -302,11 +282,6 @@ class SimpleSurvivalAI:
                 bomb_pos = plan_goal
                 escape_pos = plan.get("escape_cell", "chưa tính")
                 escape_path = plan.get("escape_path", [])
-                
-                logger.info(f"💣 PLAN DÀI HẠN - ĐẾN VỊ TRÍ ĐẶT BOM: {plan_goal}")
-                logger.info(f"🎯 PLAN CHI TIẾT: ĐẾN {bomb_pos} → ĐẶT BOM → THOÁT ĐẾN {escape_pos}")
-                if escape_path:
-                    logger.info(f"🛡️ ĐƯỜNG THOÁT: {escape_path}")
                 
                 self.last_action_time = current_time
                 self._update_last_direction(current_cell, plan_goal)
@@ -324,11 +299,8 @@ class SimpleSurvivalAI:
                     "escape_cell": escape_pos,
                     "escape_path": escape_path
                 }
-                logger.info(f"📤 RETURN ACTION: {action}")
-                logger.info(f"💾 LƯU escape_path vào ACTION: {escape_path}")
                 return action
         elif plan_type == "explore":
-            logger.info(f"🗺️ PLAN DÀI HẠN - KHÁM PHÁ: đến {plan_goal}")
             self.last_action_time = current_time
             self._update_last_direction(current_cell, plan_goal)
             return {"type": "move", "goal_cell": plan_goal}
@@ -359,7 +331,6 @@ class SimpleSurvivalAI:
                     "escape_time": 0
                 }
         except Exception as e:
-            logger.warning(f"⚠️ LỖI TÍNH ESCAPE PLAN: {e}")
             return {
                 "escape_cell": None,
                 "escape_path": [],
@@ -369,7 +340,6 @@ class SimpleSurvivalAI:
     def _try_move_to(self, current_cell: Tuple[int, int], goal_cell: Tuple[int, int], current_time: float, label: str) -> Optional[Dict[str, Any]]:
         """Helper: Tạo move action nếu có thể đến goal"""
         if goal_cell and goal_cell != current_cell and self._can_reach_goal(current_cell, goal_cell):
-            logger.info(f"{label}: đến {goal_cell}")
             self.last_action_time = current_time
             self._update_last_direction(current_cell, goal_cell)
             return {"type": "move", "goal_cell": goal_cell}
@@ -406,11 +376,9 @@ class SimpleSurvivalAI:
             self.movement_history = []
         
         # 4. TẮT FALLBACK - BẮT BUỘC phải tìm được safe goal!
-        logger.warning(f"🚫 KHÔNG CÓ FALLBACK - Bot phải tìm được safe goal!")
         return None
         
         # 5. TẮT RESET FALLBACK - BẮT BUỘC phải tìm được safe goal!
-        logger.warning(f"🚫 KHÔNG CÓ RESET FALLBACK - Bot phải tìm được safe goal!")
         return None
             
         return None
@@ -458,9 +426,9 @@ class SimpleSurvivalAI:
                 if item_types and item_type not in item_types:
                     continue
                 # Tính distance ĐÚNG INDENT!
-                    distance = abs(x - current_cell[0]) + abs(y - current_cell[1])
+                distance = abs(x - current_cell[0]) + abs(y - current_cell[1])
                 if distance <= radius:
-                        items.append((x, y))
+                    items.append((x, y))
             
             # Thêm chests nếu không chỉ định item_types
             if not item_types:
@@ -475,21 +443,17 @@ class SimpleSurvivalAI:
         
     def choose_next_action(self) -> Optional[Dict[str, Any]]:
         """Hàm quyết định chính - Ưu tiên sinh tồn với plan dài hạn"""
-        logger.info(f"🎯 CHOOSE_NEXT_ACTION CALLED")
         
         # Kiểm tra trạng thái game
         if not game_state.get("game_started", False):
-            logger.info(f"❌ RETURN NONE: game chưa start")
             return None
             
         # Kiểm tra map có tồn tại không (tránh lỗi sau khi hồi sinh)
         if not game_state.get("map") or len(game_state.get("map", [])) == 0:
-            logger.warning(f"🚫 AI TẠM DỪNG: Map chưa sẵn sàng sau khi hồi sinh")
             return None
             
         me = get_my_bomber()
         if not me:
-            logger.info(f"❌ RETURN NONE: không tìm thấy bot")
             return None
             
         # WORKAROUND: Server đôi khi set movable=False và không update lại
@@ -503,25 +467,18 @@ class SimpleSurvivalAI:
             # - Đang bị protect (vừa hồi sinh)
             # - Hoặc đã chết
             if protect_cooldown > 0 or not is_alive:
-                logger.warning(f"❌ BOT BỊ STUN THẬT: protectCooldown={protect_cooldown}, isAlive={is_alive}")
                 return None
-            else:
-                # movable=False nhưng không có lý do rõ ràng -> BỎ QUA và tiếp tục
-                logger.info(f"⚠️ IGNORE movable=False (có thể là animation delay)")
-                # Tiếp tục xử lý bình thường
+            # movable=False nhưng không có lý do rõ ràng -> BỎ QUA và tiếp tục
+            # Tiếp tục xử lý bình thường
             
         current_cell = get_my_cell()
         if not current_cell:
-            logger.info(f"❌ RETURN NONE: không lấy được current_cell")
             return None
         
         # Kiểm tra vị trí hiện tại có hợp lệ không
         if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
-            logger.warning(f"🚫 VỊ TRÍ BOT KHÔNG HỢP LỆ: {current_cell} - Bỏ qua AI")
             return None
-        
-        logger.info(f"✅ BOT INFO: position={current_cell}, movable={me.get('movable')}")
-        
+
         # Cập nhật bộ nhớ khám phá
         self._update_visited_cells(current_cell)
         
@@ -533,7 +490,6 @@ class SimpleSurvivalAI:
             if self._last_position and self._last_position != current_cell:
                 distance = abs(current_cell[0] - self._last_position[0]) + abs(current_cell[1] - self._last_position[1])
                 if distance > 3:  # Di chuyển xa hơn 3 ô = có thể hồi sinh
-                    logger.info(f"🔄 VỊ TRÍ THAY ĐỔI: từ {self._last_position} đến {current_cell}, reset plan")
                     self.current_plan = None
                     self.movement_history.clear()
                     self.visited_cells.clear()
@@ -548,19 +504,16 @@ class SimpleSurvivalAI:
         move_time = self._get_move_time_ms(my_uid)
         if current_time - self.last_action_time < move_time:
             time_left = move_time - (current_time - self.last_action_time)
-            logger.info(f"⏰ THROTTLE: còn {time_left:.0f}ms")
             return None
         
         # 0. ƯU TIÊN TUYỆT ĐỐI - THOÁT SAU KHI ĐẶT BOM
         if self.must_escape_bomb:
-            logger.warning(f"🏃 BẮT BUỘC THOÁT: vừa đặt bom, phải chạy ngay!")
             
             # QUAN TRỌNG: Kiểm tra xem movement planner đã có escape plan chưa
             # Nếu có rồi thì KHÔNG tạo action mới, để movement planner xử lý!
             from .movement import get_movement_planner
             movement_planner = get_movement_planner()
             if movement_planner.plan.get("is_escape_plan") and movement_planner.plan.get("path_valid"):
-                logger.info(f"✅ ĐÃ CÓ ESCAPE PLAN trong movement planner - để nó xử lý!")
                 self.must_escape_bomb = False  # Clear flag
                 return None  # Trả về None để bot_controller dùng movement planner
             
@@ -575,66 +528,50 @@ class SimpleSurvivalAI:
                 dx, dy = DIRECTIONS[direction]
                 next_cell = (current_cell[0] + dx, current_cell[1] + dy)
                 if self._is_cell_passable(next_cell):
-                    logger.warning(f"🏃 THOÁT KHẨN CẤP: {direction}")
                     self.last_action_time = current_time
                     return {"type": "move", "goal_cell": next_cell}
             
             # Nếu không thể thoát, clear plan để tạo plan mới
-            logger.warning(f"🚫 KHÔNG THỂ THOÁT: Clear plan và tạo plan mới")
             self.current_plan = None
         
         # 1. KIỂM TRA AN TOÀN TUYỆT ĐỐI - Chạy khỏi bom
         in_danger = self._is_in_danger(current_cell, current_time)
         if in_danger:
-            logger.warning(f"🚨 ĐANG Ở VÙNG NGUY HIỂM: {current_cell}")
             safe_goal = self._find_safe_goal(current_cell, current_time)
             if safe_goal:
-                logger.warning(f"🚨 THOÁT HIỂM: đến {safe_goal}")
                 self.last_action_time = current_time
                 return {"type": "move", "goal_cell": safe_goal}
-            logger.warning(f"🚨 THOÁT HIỂM: Không tìm thấy nơi an toàn!")
             return None
-        else:
-            logger.debug(f"✅ KHÔNG NGUY HIỂM: {current_cell} an toàn")
         
         # QUAN TRỌNG: Kiểm tra xem có escape plan đang chạy không
         # Nếu có → KHÔNG TẠO ACTION MỚI, để movement planner xử lý!
         from .movement import get_movement_planner
         movement_planner = get_movement_planner()
         if movement_planner.plan.get("is_escape_plan") and movement_planner.plan.get("path_valid"):
-            logger.warning(f"🏃 ĐANG ESCAPE - BỎ QUA TẠO ACTION MỚI!")
             return None  # Để movement planner tiếp tục escape
         
         # 1.5. LẬP PLAN DÀI HẠN - Mục tiêu rõ ràng
         # CHỈ tạo plan mới khi chưa có plan hoặc plan đã hoàn thành
         if not self.current_plan:
-            logger.info(f"🎯 TẠO PLAN MỚI: chưa có current_plan")
             long_term_plan = self._create_long_term_plan(current_cell, current_time)
             if long_term_plan:
                 self.current_plan = long_term_plan
-                logger.info(f"✅ ĐÃ TẠO PLAN: {long_term_plan.get('type')} → {long_term_plan.get('goal_cell')}")
                 return self._execute_long_term_plan(long_term_plan, current_cell, current_time, can_place_bomb)
-            else:
-                logger.warning(f"❌ KHÔNG TẠO ĐƯỢC PLAN: _create_long_term_plan return None")
         else:
             # Đang có plan cũ - tiếp tục thực hiện
-            logger.debug(f"🔄 TIẾP TỤC PLAN CŨ: {self.current_plan.get('type')} → {self.current_plan.get('goal_cell')}")
             return self._execute_long_term_plan(self.current_plan, current_cell, current_time, can_place_bomb)
         
         # 1.6. ƯU TIÊN ĐẶT BOM LIÊN TỤC - Sau khi bom nổ
         if self._should_continue_bombing(current_cell, current_time, can_place_bomb):
-            logger.info(f"💣 ĐẶT BOM LIÊN TỤC: tiếp tục sau khi bom nổ")
             self.last_action_time = current_time
             self.last_bomb_time_ms = current_time
             self.must_escape_bomb = True  # BẮT BUỘC thoát lần loop tiếp
-            logger.warning(f"⚡ SET FLAG: must_escape_bomb = True (bomb liên tục)")
             # QUAN TRỌNG: Blacklist vị trí đặt bom để tránh lặp lại!
             self._add_to_blacklist(current_cell, current_time)
             return {"type": "bomb"}
         
         # 1.6.5. ƯU TIÊN THOÁT KHỎI VÙNG NGUY HIỂM SAU KHI ĐẶT BOM
         if self._should_escape_after_bomb(current_cell, current_time):
-            logger.info(f"🏃 THOÁT KHỎI VÙNG NGUY HIỂM: sau khi đặt bom")
             escape_move = self._get_escape_move(current_cell, current_time)
             if escape_move:
                 self.last_action_time = current_time
@@ -643,17 +580,10 @@ class SimpleSurvivalAI:
         # 1.7 & 1.8. ƯU TIÊN TRÁNH BOT KHÁC (merge 2 bước)
         has_nearby, min_dist, dangerous = self._get_enemy_info(current_cell, max_radius=3)
         if has_nearby or dangerous:
-            if has_nearby:
-                logger.info(f"🤖 GẦN BOT KHÁC (distance={min_dist}): ưu tiên di chuyển thông minh")
-            if dangerous:
-                logger.info(f"🤖 TRÁNH BOT NGUY HIỂM: {len(dangerous)} bot mạnh")
-            
             smart_move = self._get_smart_move_near_enemy(current_cell, current_time)
             if smart_move:
                 self.last_action_time = current_time
                 return smart_move
-            else:
-                logger.warning(f"⚠️ KHÔNG TÌM ĐƯỢC SMART MOVE: gần bot nhưng không có nước đi")
             
         # 4. BỎ QUA kiểm tra đứng im để bot luôn di chuyển
         # should_idle = self._should_idle(current_cell, current_time)
@@ -679,9 +609,6 @@ class SimpleSurvivalAI:
         if fallback_action:
             # Clear plan khi dùng fallback
             self.current_plan = None
-            logger.info(f"🔄 FALLBACK ACTION: {fallback_action}")
-        else:
-            logger.warning(f"🚫 KHÔNG CÓ ACTION: Không có safe move, bomb target, hay fallback!")
         return fallback_action
         
     def _update_last_direction(self, from_cell: Tuple[int, int], to_cell: Tuple[int, int]) -> None:
@@ -770,7 +697,6 @@ class SimpleSurvivalAI:
                 best_move = next_cell
         
         if best_move:
-            logger.info(f"🤖 DI CHUYỂN THÔNG MINH: từ {current_cell} đến {best_move} (score={best_score})")
             self._update_last_direction(current_cell, best_move)
             return {"type": "move", "goal_cell": best_move}
         
@@ -818,7 +744,6 @@ class SimpleSurvivalAI:
             # Nếu di chuyển ngược lại hướng vừa đi
             if (current_dx == -last_dx and current_dy == -last_dy) and (current_dx != 0 or current_dy != 0):
                 score -= 30.0  # Trừ điểm mạnh nếu di chuyển ngược lại
-                logger.debug(f"🔄 TRÁNH VÒNG LẶP: di chuyển ngược lại hướng {self._last_direction}")
         
         # 6. Ưu tiên di chuyển xa khỏi vị trí hiện tại
         distance_from_current = abs(next_cell[0] - current_cell[0]) + abs(next_cell[1] - current_cell[1])
@@ -866,7 +791,6 @@ class SimpleSurvivalAI:
                 best_move = next_cell
         
         if best_move:
-            logger.info(f"🤖 TRÁNH BOT KHÁC: từ {current_cell} đến {best_move} (score={best_score})")
             self._update_last_direction(current_cell, best_move)
             return {"type": "move", "goal_cell": best_move}
         
@@ -880,7 +804,6 @@ class SimpleSurvivalAI:
         # QUAN TRỌNG: Kiểm tra NGAY LẬP TỨC sau khi đặt bom (trong vòng 500ms)
         time_since_bomb = current_time - self.last_bomb_time_ms
         if time_since_bomb <= 500:  # 500ms = ngay sau khi đặt bom
-            logger.info(f"🏃 CẦN THOÁT NGAY: vừa đặt bom {time_since_bomb:.0f}ms trước")
             return True
         
         # Kiểm tra nếu vừa đặt bom gần đây (trong vòng 4 giây)
@@ -889,7 +812,6 @@ class SimpleSurvivalAI:
             
         # Kiểm tra nếu đang ở vùng nguy hiểm
         if self._is_in_danger(cell, current_time):
-            logger.info(f"🏃 CẦN THOÁT: đang ở vùng nguy hiểm sau khi đặt bom")
             return True
             
         # Kiểm tra nếu có bom gần đó sắp nổ
@@ -905,7 +827,6 @@ class SimpleSurvivalAI:
                 if distance <= 4:
                     life_time = bomb.get("lifeTime", 5000)
                     if life_time <= 3500:  # Còn ít hơn 3.5 giây
-                        logger.info(f"🏃 CẦN THOÁT: bom sắp nổ tại {bomb_cell}, còn {life_time}ms")
                         return True
         except Exception:
             pass
@@ -929,11 +850,10 @@ class SimpleSurvivalAI:
                 result = pathfinding.find_escape_path_from_bomb(bomb_cell, current_cell, explosion_range, life_time)
                 if result and len(result[0]) >= 2:
                     next_cell = result[0][1]
-                    logger.info(f"✅ ESCAPE: {current_cell} → {next_cell}, t={result[1]:.0f}ms < {life_time:.0f}ms")
                     self._update_last_direction(current_cell, next_cell)
                     return {"type": "move", "goal_cell": next_cell}
         except Exception as e:
-            logger.error(f"❌ Lỗi escape: {e}")
+            pass
     
         # Fallback: tìm ô an toàn gần nhất
         best_move = None
@@ -949,7 +869,6 @@ class SimpleSurvivalAI:
                 best_move = next_cell
         
         if best_move:
-            logger.info(f"🏃 ESCAPE FALLBACK: {current_cell} → {best_move}")
             self._update_last_direction(current_cell, best_move)
             return {"type": "move", "goal_cell": best_move}
         return None
@@ -961,15 +880,12 @@ class SimpleSurvivalAI:
     def _is_cell_passable(self, cell: Tuple[int, int]) -> bool:
         """Wrapper cho pathfinding.is_cell_passable()"""
         return pathfinding.is_cell_passable(cell)
-        
-        
+
     def _find_safe_goal(self, cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
         """Tìm mục tiêu an toàn thông minh"""
-        logger.info(f"🔍 TÌM MỤC TIÊU AN TOÀN: từ {cell}")
         
         # QUAN TRỌNG: Kiểm tra bot có đang trong vùng nguy hiểm không!
         if self._is_in_danger(cell, current_time):
-            logger.warning(f"🚨 BOT ĐANG TRONG VÙNG NGUY HIỂM tại {cell} - THOÁT NGAY!")
             # Tìm ô an toàn gần nhất để thoát
             for radius in range(1, 4):  # Chỉ tìm trong 3 bước để thoát nhanh
                 candidates = []
@@ -1002,7 +918,6 @@ class SimpleSurvivalAI:
                     for priority, target in candidates:
                         test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                         if test_path and len(test_path) >= 1:  # FIX: >= 1 để cho phép ô kề cạnh
-                            logger.info(f"🎯 TÌM THẤY ô an toàn trong bán kính {radius}: {target} (có đường đi)")
                             return target
                 # Nếu không có candidate nào có đường đi, thử radius lớn hơn
                 # logger.warning(f"⚠️ CÁC Ô AN TOÀN trong bán kính {radius} KHÔNG CÓ ĐƯỜNG ĐI")  # Giảm log spam
@@ -1018,11 +933,9 @@ class SimpleSurvivalAI:
                     explosion_tick = fs.dynamic.hazard_until[cy, cx]
                     if explosion_tick > current_tick:
                         time_until_explosion = (explosion_tick - current_tick) * 100  # Convert tick to ms
-                        logger.warning(f"🚨 BOM SẮP NỔ tại {cell} trong {time_until_explosion:.0f}ms - THOÁT NGAY!")
                         
                         # QUAN TRỌNG: XÓA MỌI PLAN và THOÁT NGAY!
                         self.current_plan = None
-                        logger.warning(f"🗑️ XÓA MỌI PLAN - THOÁT NGAY!")
                         
                         # Tìm ô an toàn gần nhất để thoát
                         for radius in range(1, 4):  # Chỉ tìm trong 3 bước để thoát nhanh
@@ -1052,17 +965,14 @@ class SimpleSurvivalAI:
                                 for priority, target in candidates:
                                     test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                                     if test_path and len(test_path) >= 1:
-                                        logger.warning(f"🚨 THOÁT NGAY đến {target} (có đường đi)")
                                         return target
         except Exception as e:
-            logger.debug(f"Lỗi kiểm tra bom sắp nổ: {e}")
+            pass
         
         # EMERGENCY: Chọn ô kề cạnh an toàn đầu tiên!
-        logger.warning(f"🚨 EMERGENCY: Chọn ô kề cạnh an toàn từ {cell}")
         
         # QUAN TRỌNG: XÓA MỌI PLAN khi vào emergency!
         self.current_plan = None
-        logger.warning(f"🗑️ XÓA MỌI PLAN - EMERGENCY!")
         
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
@@ -1079,25 +989,12 @@ class SimpleSurvivalAI:
                     cell_int = (int(cell[0]), int(cell[1]))
                     test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                     if test_path and len(test_path) >= 1:
-                        logger.warning(f"🚨 EMERGENCY: THOÁT NGAY đến {target} (có đường đi)")
                         return target
-                    else:
-                        logger.debug(f"🚨 EMERGENCY: Bỏ qua {target} - không có đường đi")
-                else:
-                    # DEBUG: Log tại sao không chọn target này
-                    if not self._is_cell_passable(target):
-                        logger.debug(f"🚨 EMERGENCY: Bỏ qua {target} - không thể đi được")
-                    elif self._is_in_danger(target, current_time + 2000):
-                        logger.debug(f"🚨 EMERGENCY: Bỏ qua {target} - nguy hiểm")
-                    elif self._is_position_blacklisted(target, current_time):
-                        logger.debug(f"🚨 EMERGENCY: Bỏ qua {target} - đã blacklist")
         
         # CUỐI CÙNG: Nếu vẫn không tìm được ô an toàn, chọn ô gần nhất có thể đi được
-        logger.warning(f"🚨 CUỐI CÙNG: Chọn ô gần nhất có thể đi được từ {cell}")
         
         # QUAN TRỌNG: XÓA MỌI PLAN khi vào cuối cùng!
         self.current_plan = None
-        logger.warning(f"🗑️ XÓA MỌI PLAN - CUỐI CÙNG!")
         
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
@@ -1113,22 +1010,10 @@ class SimpleSurvivalAI:
                     cell_int = (int(cell[0]), int(cell[1]))
                     test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                     if test_path and len(test_path) >= 1:
-                        logger.warning(f"🚨 CUỐI CÙNG: THOÁT NGAY đến {target} (có thể nguy hiểm nhưng có thể đi được)")
                         return target
-                    else:
-                        logger.debug(f"🚨 CUỐI CÙNG: Bỏ qua {target} - không có đường đi")
-                else:
-                    # DEBUG: Log tại sao không chọn target này
-                    if not self._is_cell_passable(target):
-                        logger.debug(f"🚨 CUỐI CÙNG: Bỏ qua {target} - không thể đi được")
-                    elif self._is_position_blacklisted(target, current_time):
-                        logger.debug(f"🚨 CUỐI CÙNG: Bỏ qua {target} - đã blacklist")
         
-        logger.error(f"💀 KHÔNG CÓ Ô AN TOÀN NÀO từ {cell} - Bot sẽ chết!")
         return None
-        
-        
-        
+
     def _should_place_bomb_for_chest(self, cell: Tuple[int, int], current_time: float, can_place: bool) -> bool:
         """
         Quyết định có nên đặt bom để nổ rương không
@@ -1154,17 +1039,13 @@ class SimpleSurvivalAI:
             )
             
             if should_place:
-                logger.info(f"✅ AN TOÀN ĐẶT BOM: Đã kiểm tra đường thoát và timing")
                 return True
             else:
-                logger.warning(f"⚠️ KHÔNG AN TOÀN: Không đủ điều kiện đặt bom tại {cell}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Lỗi advanced bombing: {e}")
             # Fallback về logic cũ
             if (self._has_chest_in_bomb_range(cell) and self._has_escape_after_bomb(cell)):
-                logger.info(f"💣 ĐẶT BOM (FALLBACK): có rương và có lối thoát")
                 return True
             return False
     
@@ -1191,10 +1072,8 @@ class SimpleSurvivalAI:
                     path = astar_shortest_path(current_cell, best_position, avoid_hazard=True, avoid_bots=False)
                     if not path or len(path) < 2:
                         return None
-                logger.info(f"🎯 Tìm thấy vị trí đặt bom: {best_position}")
                 return best_position
         except Exception as e:
-            logger.error(f"❌ Lỗi bombing: {e}")
             return None
     
     def _is_position_blacklisted(self, position: Tuple[int, int], current_time: float) -> bool:
@@ -1230,13 +1109,8 @@ class SimpleSurvivalAI:
                 # Blacklist tất cả blast zones
                 for blast_pos in blast_zones:
                     self.failed_bomb_positions[blast_pos] = current_time
-                
-                logger.info(f"🚫 BLACKLIST: Thêm {position} + {len(blast_zones)} blast zones vào danh sách cấm ({len(self.failed_bomb_positions)} vị trí)")
-            else:
-                logger.info(f"🚫 BLACKLIST: Thêm {position} vào danh sách cấm ({len(self.failed_bomb_positions)} vị trí)")
         except Exception as e:
-            logger.error(f"❌ Lỗi blacklist blast zone: {e}")
-        logger.info(f"🚫 BLACKLIST: Thêm {position} vào danh sách cấm ({len(self.failed_bomb_positions)} vị trí)")
+            pass
 
     def _get_bomb_positions_for_chest_with_range(self, chest: Tuple[int, int]) -> List[Tuple[int, int]]:
         """Tìm vị trí đặt bom để nổ rương - SỬ DỤNG TẦM NỔ THỰC TẾ"""
@@ -1273,10 +1147,8 @@ class SimpleSurvivalAI:
             return bomb_positions
             
         except Exception as e:
-            logger.error(f"❌ Lỗi tìm vị trí đặt bom: {e}")
             return []
-    
-    
+
     def _update_my_bombs(self) -> None:
         """Cập nhật theo dõi bom của mình"""
         try:
@@ -1297,12 +1169,11 @@ class SimpleSurvivalAI:
             exploded_bombs = self.my_bombs - current_bombs
             if exploded_bombs:
                 self.bomb_exploded_time = time.time() * 1000
-                logger.info(f"💥 BOM NỔ: {exploded_bombs} - Sẵn sàng đặt bom tiếp")
             
             self.my_bombs = current_bombs
             
         except Exception as e:
-            logger.error(f"Lỗi cập nhật bom: {e}")
+            pass
     
     def _should_continue_bombing(self, current_cell: Tuple[int, int], current_time: float, can_place: bool) -> bool:
         """Kiểm tra có nên tiếp tục đặt bom sau khi bom nổ"""
@@ -1346,10 +1217,8 @@ class SimpleSurvivalAI:
         
         escape_result = find_escape_path_from_bomb(current_cell, current_cell, explosion_range, 5000.0)
         if not escape_result:
-            logger.warning(f"❌ BỎ QUA BOM LIÊN TỤC tại {current_cell}: KHÔNG CÓ ĐƯỜNG THOÁT THỰC TẾ!")
             return False
             
-        logger.info(f"💣 ĐẶT BOM LIÊN TỤC: có rương kề cạnh và an toàn")
         return True
     
     def _find_best_item_to_collect(self, items: List[Tuple[int, int]], current_cell: Tuple[int, int], current_time: float) -> Optional[Tuple[int, int]]:
@@ -1392,19 +1261,13 @@ class SimpleSurvivalAI:
                 best_score = score
                 best_item = item_cell
                 
-        if skipped_no_path > 0:
-            logger.warning(f"⚠️ BỎ QUA {skipped_no_path} ITEM vì không có đường đi")
-                
         if best_item:
             try:
                 from .game_state import get_tile_item
                 item_type = get_tile_item(best_item[0], best_item[1])
-                logger.info(f"💎 CHỌN VẬT PHẨM: {item_type} tại {best_item} (score={best_score})")
             except Exception:
                 pass
-        else:
-            logger.warning(f"⚠️ KHÔNG TÌM THẤY ITEM CÓ ĐƯỜNG ĐI!")
-                
+        
         return best_item
     
     def _get_item_priority(self, item_type: str) -> int:
@@ -1426,7 +1289,6 @@ class SimpleSurvivalAI:
             item_distance = 999999
             important_items = self._find_items(current_cell, radius=10, item_types=["S", "R", "B"])
             if important_items:
-                logger.info(f"💎 TÌM THẤY {len(important_items)} ITEM trong radius 10: {important_items}")
                 best_item = self._find_best_item_to_collect(important_items, current_cell, current_time)
                 if best_item and best_item != current_cell:
                     # Tính PATH LENGTH
@@ -1439,7 +1301,6 @@ class SimpleSurvivalAI:
                             item_type = get_tile_item(best_item[0], best_item[1])
                         except:
                             item_type = "?"
-                        logger.info(f"💎 ITEM {item_type} tại {best_item}: PATH LENGTH = {item_distance}")
                         item_plan = {
                         "type": "collect_item",
                         "goal_cell": best_item,
@@ -1456,14 +1317,12 @@ class SimpleSurvivalAI:
             if bomb_position:
                 from .pathfinding import is_in_danger
                 if is_in_danger(bomb_position, current_time):
-                    logger.warning(f"❌ BỎ QUA BOMB_POSITION {bomb_position}: ĐANG TRONG HAZARD ZONE!")
                     bomb_position = None  # Clear để không xử lý tiếp
             
             if bomb_position:
                 # QUAN TRỌNG: Kiểm tra nếu ĐÃ Ở vị trí đặt bom
                 if current_cell_int == bomb_position:
                     bomb_distance = 0
-                    logger.info(f"💣 BOMB tại {bomb_position}: ĐÃ Ở ĐÂY (distance=0)")
                     # Tính escape path
                     escape_info = self._calculate_escape_plan(bomb_position, current_cell)
                     escape_path = escape_info.get("escape_path", [])
@@ -1478,15 +1337,12 @@ class SimpleSurvivalAI:
                             "escape_path": escape_path,
                     "escape_time": escape_info.get("escape_time", 0)
                 }
-                    else:
-                        logger.warning(f"❌ BỎ QUA BOMB tại {bomb_position}: KHÔNG CÓ ĐƯỜNG THOÁT! (escape_path={escape_path})")
                 else:
                     # Tính PATH LENGTH
                     from .game_state import bfs_shortest_path
                     test_path = bfs_shortest_path(current_cell_int, bomb_position, avoid_hazard=True, avoid_bots=False)
                     if test_path and len(test_path) >= 1:
                         bomb_distance = len(test_path) - 1
-                        logger.info(f"💣 BOMB tại {bomb_position}: PATH LENGTH = {bomb_distance}")
                         # Tính escape path
                         escape_info = self._calculate_escape_plan(bomb_position, current_cell)
                         escape_path = escape_info.get("escape_path", [])
@@ -1501,29 +1357,21 @@ class SimpleSurvivalAI:
                                 "escape_path": escape_path,
                                 "escape_time": escape_info.get("escape_time", 0)
                             }
-                        else:
-                            logger.warning(f"❌ BỎ QUA BOMB tại {bomb_position}: KHÔNG CÓ ĐƯỜNG THOÁT! (escape_path={escape_path})")
             
             # 3. SO SÁNH VÀ CHỌN CÁI GẦN HƠN - ƯU TIÊN ITEM NẾU < 5 BƯỚC
             if item_plan and bomb_plan:
                 if item_distance < 5:  # Item gần (< 5 bước) → ƯU TIÊN ITEM
-                    logger.info(f"🏆 SO SÁNH: 💎 ITEM (distance={item_distance}) < 5 → ƯU TIÊN ITEM!")
                     return item_plan
                 elif item_distance <= bomb_distance:  # Item gần hơn hoặc bằng bomb
-                    logger.info(f"🏆 SO SÁNH: 💎 ITEM (distance={item_distance}) vs 💣 BOMB (distance={bomb_distance}) → CHỌN ITEM")
                     return item_plan
                 else:  # Bomb gần hơn
-                    logger.info(f"🏆 SO SÁNH: 💎 ITEM (distance={item_distance}) vs 💣 BOMB (distance={bomb_distance}) → CHỌN BOMB")
                     return bomb_plan
             elif item_plan:
-                logger.info(f"✅ CHỈ CÓ ITEM (distance={item_distance})")
                 return item_plan
             elif bomb_plan:
-                logger.info(f"✅ CHỈ CÓ BOMB (distance={bomb_distance})")
                 return bomb_plan
             
             # 4. CHIẾN LƯỢC DÀI HẠN (nếu không có item hoặc bomb)
-            logger.info(f"⚠️ KHÔNG CÓ ITEM/BOMB - chuyển sang EXPLORE")
             strategic_goal = self._get_strategic_goal(current_cell)
             if strategic_goal and strategic_goal != current_cell:
                 return {
@@ -1534,11 +1382,9 @@ class SimpleSurvivalAI:
                 }
                 
             # KHÔNG TÌM ĐƯỢC MỤC TIÊU NÀO
-            logger.warning(f"🚧 KHÔNG TÌM ĐƯỢC MỤC TIÊU từ {current_cell} - Bot có thể bị trapped")
             return None
             
         except Exception as e:
-            logger.error(f"❌ Lỗi tạo plan dài hạn: {e}")
             return None
     
     def _has_dangerous_bombs_nearby(self, cell: Tuple[int, int], current_time: float) -> bool:
@@ -1559,6 +1405,5 @@ def reset_ai_state():
         global survival_ai
         if survival_ai:
             survival_ai.reset_state()
-        logger.info(f"✅ GLOBAL AI RESET: Hoàn thành")
     except Exception as e:
-        logger.error(f"❌ Lỗi reset global AI: {e}")
+        pass

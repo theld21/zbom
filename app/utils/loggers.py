@@ -32,21 +32,20 @@ class MovementLogger:
             if is_exact and current_cell != self.last_cell:
                 # Convert sang int để log đẹp hơn
                 cell_int = (int(current_cell[0]), int(current_cell[1]))
-                logger.info(f"📍 ĐẾN Ô MỚI: {cell_int}")
                 self.last_cell = current_cell
         except Exception as e:
-            logger.error(f"Error checking cell arrival: {e}")
+            pass
     
     def log_movement(self, orient: str, log_enabled: bool = True):
         """Log movement"""
         if not log_enabled:
             return
-        logger.info(f"➡️ MOVE: {orient}")
+        pass
     
     @staticmethod
     def log_move(orient: str, current_pos: tuple, target_pos: tuple):
         """Log movement with positions"""
-        logger.info(f"MOVE {orient}: {current_pos} → {target_pos}")
+        pass
 
 def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True):
     """Log map state"""
@@ -59,9 +58,7 @@ def log_map_state(game_state: Dict[str, Any], log_enabled: bool = True):
         if not mp:
             return
         
-        logger.info("=== MAP ===")
         for row in mp:
-            logger.info(" ".join(str(cell) if cell else "." for cell in row))
-        logger.info("===========")
+            pass
     except Exception as e:
-        logger.error(f"Error logging map: {e}")
+        pass

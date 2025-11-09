@@ -75,7 +75,6 @@ class MovementPlanner:
         
         me = get_my_bomber()
         if not me:
-            logger.warning(f"🚫 ESCAPE PLAN FAILED: Không tìm thấy bot")
             return
         
         current_cell = pos_to_cell_int(me.get("x", 0), me.get("y", 0))
@@ -84,7 +83,6 @@ class MovementPlanner:
         filtered_path = [cell for cell in escape_path if cell != current_cell]
         
         if not filtered_path:
-            logger.warning(f"⚠️ ESCAPE PATH TRỐNG sau khi lọc")
             return
         
         # Set escape plan
@@ -100,21 +98,16 @@ class MovementPlanner:
         # RESET reverse lock để không block hướng thoát!
         self.reverse_block_until = 0
         self.recent_orient = None
-        
-        logger.info(f"🏃 ESCAPE PLAN: {len(filtered_path)} ô từ {current_cell} → {self.plan['long_term_goal']}")
-        logger.info(f"🏃 ESCAPE PATH: {' → '.join(str(c) for c in filtered_path)}")
-    
+
     def plan_path(self, goal_cell: Tuple[int, int]) -> None:
         """Lập kế hoạch đường đi dài hạn"""
         from .game_state import get_my_bomber, pos_to_cell, pos_to_cell_int, astar_shortest_path, bfs_shortest_path, is_passable
         
         me = get_my_bomber()
         if not me:
-            logger.warning(f"🚫 PLAN FAILED: Không tìm thấy bot")
             return
             
         current_cell = pos_to_cell_int(me.get("x", 0), me.get("y", 0))
-        logger.info(f"🗺️ LẬP PLAN: từ {current_cell} đến {goal_cell}")
         
         # Thử A* trước
         path = astar_shortest_path(current_cell, goal_cell, avoid_hazard=True, avoid_bots=False)
@@ -124,8 +117,6 @@ class MovementPlanner:
             self.plan["current_target_index"] = 1
             self.plan["long_term_goal"] = goal_cell
             self.plan["path_valid"] = True
-            logger.info(f"🗺️ PLAN DÀI HẠN: {len(path)} ô từ {current_cell} đến {goal_cell}")
-            logger.info(f"🗺️ PATH: {' → '.join(str(cell) for cell in path)}")
         else:
             # Thử BFS
             path_bfs = bfs_shortest_path(current_cell, goal_cell, avoid_hazard=True, avoid_bots=False)
@@ -135,11 +126,8 @@ class MovementPlanner:
                 self.plan["current_target_index"] = 1
                 self.plan["long_term_goal"] = goal_cell
                 self.plan["path_valid"] = True
-                logger.info(f"🗺️ PLAN BFS: {len(path_bfs)} ô từ {current_cell} đến {goal_cell}")
-                logger.info(f"🗺️ PATH: {' → '.join(str(cell) for cell in path_bfs)}")
             else:
                 # Tìm ô thay thế gần nhất
-                logger.warning(f"❌ KHÔNG CÓ ĐƯỜNG ĐẾN: {goal_cell} từ {current_cell}")
                 self.plan["path_valid"] = False
                 
                 best_cell = None
@@ -167,16 +155,13 @@ class MovementPlanner:
                         self.plan["current_target_index"] = 1
                         self.plan["long_term_goal"] = best_cell  # Mục tiêu là best_cell, không phải goal_cell
                         self.plan["path_valid"] = True
-                        logger.info(f"🗺️ FALLBACK PATH: {len(full_path)} ô từ {current_cell} → {best_cell} (thay vì {goal_cell})")
                     else:
                         # QUAN TRỌNG: Nếu KHÔNG TÌM ĐƯỢC path đầy đủ → KHÔNG TẠO PLAN SAI!
                         # Path chỉ 2 điểm [start, goal] sẽ khiến bot đi thẳng qua tường!
-                        logger.warning(f"❌ KHÔNG TÌM ĐƯỢC PATH ĐẾN: {best_cell} từ {current_cell}")
                         self.plan["path"] = []
                         self.plan["current_target_index"] = 0
                         self.plan["path_valid"] = False
                 else:
-                    logger.warning(f"🚫 KHÔNG TÌM THẤY Ô THAY THẾ cho {goal_cell}")
                     self.plan["path"] = []
                     self.plan["current_target_index"] = 0
                     self.plan["path_valid"] = False
@@ -210,12 +195,10 @@ class MovementPlanner:
         if is_at_half_y and abs(dy) > 0.1:
             # Đang ở giữa 2 ô dọc → phải đi dọc để về ô nguyên trước
             direction = "DOWN" if dy > 0 else "UP"
-            logger.debug(f"🔧 Ở .5 dọc {current_cell} → đi {direction} về ô nguyên trước")
             return direction
         elif is_at_half_x and abs(dx) > 0.1:
             # Đang ở giữa 2 ô ngang → phải đi ngang để về ô nguyên trước
             direction = "RIGHT" if dx > 0 else "LEFT"
-            logger.debug(f"🔧 Ở .5 ngang {current_cell} → đi {direction} về ô nguyên trước")
             return direction
         # Nếu đã ở ô nguyên → di chuyển bình thường
         elif abs(dx) > 0.1:  # Có khoảng cách theo X
@@ -244,7 +227,6 @@ class MovementPlanner:
         # Check arrival TRƯỚC khi get direction
         # Bounds check để tránh IndexError
         if self.plan["current_target_index"] >= len(self.plan["path"]):
-            logger.warning(f"🚫 INDEX OUT OF RANGE: current_target_index={self.plan['current_target_index']} >= path_len={len(self.plan['path'])}")
             self.reset()
             return
             
@@ -282,12 +264,7 @@ class MovementPlanner:
             (curx % CELL_SIZE <= 5 and cury % CELL_SIZE <= 5)
         )
         
-        from .config import LOG_ARRIVAL_CHECK
-        if LOG_ARRIVAL_CHECK:
-            logger.info(f"🔍 ARRIVAL CHECK: bot({curx:.1f},{cury:.1f}) → cell{current_cell} vs target{target_cell} = {arrived}")
-        
         if arrived:
-            logger.info(f"✅ ĐẾN Ô: pixel({curx:.1f},{cury:.1f}) tile{current_cell} = target{target_cell}")
             self.plan["current_target_index"] += 1
             self.reverse_block_until = current_time + reverse_lock_seconds
             self.recent_orient = direction
@@ -302,22 +279,18 @@ class MovementPlanner:
                 # Nếu hoàn thành ESCAPE PLAN, clear must_escape_bomb flag!
                 was_escape_plan = self.plan.get("is_escape_plan", False)
                 if was_escape_plan:
-                    logger.info(f"✅ HOÀN THÀNH ESCAPE: đã thoát đến {self.plan['long_term_goal']}")
                     # Clear escape flag trong survival_ai
                     try:
                         from .survival_ai import survival_ai
                         if survival_ai:
                             survival_ai.must_escape_bomb = False
-                            logger.warning(f"🟢 CLEAR FLAG: must_escape_bomb = False (đã thoát an toàn)")
                     except Exception:
                         pass
                     # QUAN TRỌNG: Hoàn thành ESCAPE → XÓA HẾT plan_type, escape_path
                     # để bot_controller KHÔNG ĐẶT BOM!
-                    logger.warning(f"🗑️ XÓA plan_type và escape_path sau khi ESCAPE xong")
                     self.plan["just_completed"] = time.time()
                     self.reset()  # Reset sạch sẽ, không giữ lại gì
                 else:
-                    logger.info(f"✅ HOÀN THÀNH 1: đã đến {self.plan['long_term_goal']}")
                     # QUAN TRỌNG: Set just_completed TRƯỚC KHI reset để giữ plan_type!
                     self.plan["just_completed"] = time.time()
                     # Lưu các field quan trọng trước khi reset (CHỈ khi KHÔNG phải escape)
@@ -337,7 +310,6 @@ class MovementPlanner:
             else:
                 # Chưa đến ô cuối cùng - tiếp tục đi đến ô tiếp theo
                 next_target = self.plan["path"][self.plan["current_target_index"]]
-                logger.info(f"📍 ĐẾN Ô TRUNG GIAN: {target_cell}, tiếp tục đến {next_target}")
             
             return
         else:
@@ -364,22 +336,18 @@ class MovementPlanner:
                             # Nếu hoàn thành ESCAPE PLAN, clear must_escape_bomb flag!
                             was_escape_plan = self.plan.get("is_escape_plan", False)
                             if was_escape_plan:
-                                logger.info(f"✅ HOÀN THÀNH ESCAPE 2: đã thoát đến {self.plan['long_term_goal']}")
                                 # Clear escape flag trong survival_ai
                                 try:
                                     from .survival_ai import survival_ai
                                     if survival_ai:
                                         survival_ai.must_escape_bomb = False
-                                        logger.warning(f"🟢 CLEAR FLAG: must_escape_bomb = False (đã thoát an toàn)")
                                 except Exception:
                                     pass
                                 # QUAN TRỌNG: Hoàn thành ESCAPE → XÓA HẾT plan_type, escape_path
                                 # để bot_controller KHÔNG ĐẶT BOM!
-                                logger.warning(f"🗑️ XÓA plan_type và escape_path sau khi ESCAPE xong")
                                 self.plan["just_completed"] = time.time()
                                 self.reset()  # Reset sạch sẽ, không giữ lại gì
                             else:
-                                logger.info(f"✅ HOÀN THÀNH 2: đã đến {self.plan['long_term_goal']}")
                                 # QUAN TRỌNG: Set just_completed TRƯỚC KHI reset để giữ plan_type!
                                 self.plan["just_completed"] = time.time()
                                 # Lưu các field quan trọng trước khi reset (CHỈ khi KHÔNG phải escape)
@@ -397,15 +365,12 @@ class MovementPlanner:
                                     self.plan["escape_path"] = saved_escape_path
                             return
                         else:
-                            logger.warning(f"🚫 HẾT PATH NHƯNG CHƯA ĐẾN ĐÍch: hiện tại {current_pos} vs mục tiêu {goal_pos}")
                             return
                 else:
-                    logger.warning(f"🚫 KHÔNG CÓ HƯỚNG DI CHUYỂN: chưa đến đích nhưng không có direction")
                     return
                 
             # Check oscillation
             if self.detect_oscillation(direction):
-                logger.warning(f"🚫 PHÁT HIỆN OSCILLATION: {self.oscillation_detector[-4:]} - Reset plan!")
                 self.reset()
                 return
             
@@ -420,11 +385,7 @@ class MovementPlanner:
                     from .game_state import pos_to_cell_int
                     current_cell = pos_to_cell_int(curx, cury)
                     if current_cell == self.plan.get("last_reverse_cell"):
-                        logger.warning(f"🚫 CHỐNG ĐẢO CHIỀU: Bỏ qua hướng {direction}")
                         return
-                    else:
-                        # Đang di chuyển theo plan bình thường, không chặn
-                        logger.info(f"✅ TIẾP TỤC PLAN: {direction} từ {current_cell}")
         
         # Tính remaining pixels
         goal_center_x = target_cell[0] * cell_size + cell_size // 2
@@ -442,8 +403,6 @@ class MovementPlanner:
         self.plan["remaining_px"] = float(remain_px)
         
         self.plan["orient"] = direction
-        if remain_px > 0:
-            logger.debug(f"🚶 ĐI: pixel({curx:.1f},{cury:.1f}) tile{actual_current_cell} → target{target_cell}, còn {remain_px:.1f}px")
 
 # Singleton instance
 _movement_planner: Optional[MovementPlanner] = None

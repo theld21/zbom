@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any, Tuple
 
 logger = logging.getLogger(__name__)
 
-
 class BotController:
     """Controller quản lý toàn bộ logic di chuyển của bot"""
     
@@ -26,7 +25,6 @@ class BotController:
         self.arrival_block_until = 0.0
         self.last_pos = (0.0, 0.0)
         self.stuck_count = 0
-        logger.info("🔄 BOT CONTROLLER RESET")
     
     def can_emit_move_now(self, max_cmds_per_sec: float) -> bool:
         """Kiểm tra có thể gửi lệnh di chuyển không"""
@@ -70,7 +68,6 @@ class BotController:
             me = get_my_bomber()
             if me:
                 current_cell = pos_to_cell(me.get("x", 0), me.get("y", 0))
-                logger.info(f"🤖 VỊ TRÍ: ({me.get('x', 0):.1f}, {me.get('y', 0):.1f}) → ô {current_cell}")
             
             # Log map nếu cần
             if log_map:
@@ -82,23 +79,17 @@ class BotController:
             
             # QUAN TRỌNG: Kiểm tra xem có tìm được path không!
             if not movement_planner.plan.get("path_valid"):
-                logger.warning(f"❌ KHÔNG TÌM ĐƯỢC PATH ĐẾN {goal_cell} - XÓA PLAN THẤT BẠI!")
                 # Clear plan trong survival AI để tạo plan mới
                 survival_ai.current_plan = None
-                logger.info(f"🗑️ ĐÃ XÓA current_plan trong survival AI")
                 return False
             
             # Lưu plan_type và escape_path từ action
             if action.get("plan_type"):
                 movement_planner.plan["plan_type"] = action["plan_type"]
-                logger.info(f"📋 ĐÃ SET PLAN_TYPE = {action['plan_type']}")
-            else:
-                logger.info(f"⚠️ ACTION KHÔNG CÓ PLAN_TYPE! action={action}")
             
             # Lưu escape_path nếu có
             if action.get("escape_path"):
                 movement_planner.plan["escape_path"] = action["escape_path"]
-                logger.info(f"💾 ĐÃ LƯU ESCAPE_PATH vào plan: {action['escape_path']}")
             
             # Lấy direction tiếp theo
             direction = movement_planner.get_next_direction()
@@ -113,16 +104,11 @@ class BotController:
             
             # Set flag escape
             survival_ai.must_escape_bomb = True
-            logger.warning(f"⚡ SET FLAG: must_escape_bomb = True")
             
             # QUAN TRỌNG: LẬP ESCAPE PLAN NGAY SAU KHI ĐẶT BOM!
             escape_path = action.get("escape_path")
             if escape_path and len(escape_path) >= 2:
-                logger.info(f"🏃 LẬP ESCAPE PLAN NGAY SAU KHI ĐẶT BOM: {escape_path}")
                 movement_planner.plan_escape_path(escape_path)
-                logger.info(f"✅ ĐÃ LẬP ESCAPE PLAN: bot sẽ chạy thoát ngay!")
-            else:
-                logger.warning(f"⚠️ KHÔNG CÓ ESCAPE PATH! Bot sẽ tự tìm đường thoát")
             
             self.stuck_count = 0
             return True
@@ -203,7 +189,6 @@ class BotController:
                                 return False
                             
                             if not plan.get("logged_bomb_action"):
-                                logger.info(f"💣 PATH HOÀN THÀNH - ĐẶT BOM TẠI: {current_cell_int}")
                                 plan["logged_bomb_action"] = True
                             
                             # Đặt bom
@@ -212,28 +197,20 @@ class BotController:
                             
                             # Set escape flag
                             survival_ai.must_escape_bomb = True
-                            logger.warning(f"⚡ SET FLAG: must_escape_bomb = True")
                             
                             # QUAN TRỌNG: Lấy escape_path từ movement plan (đã lưu trước đó) và lập ESCAPE PLAN!
                             escape_path = plan.get("escape_path", [])
                             if escape_path and len(escape_path) >= 2:
-                                logger.info(f"🏃 LẬP ESCAPE PLAN SAU KHI ĐẶT BOM: {escape_path}")
                                 movement_planner.plan_escape_path(escape_path)
-                                logger.info(f"✅ ĐÃ LẬP ESCAPE PLAN: bot sẽ chạy thoát!")
-                            else:
-                                logger.warning(f"⚠️ KHÔNG CÓ ESCAPE PATH trong movement plan!")
-                            
                             # XÓA các field đã dùng để tránh đặt bom lại lần nữa
                             plan.pop("escape_path", None)
                             plan.pop("just_completed", None)
                             plan.pop("plan_type", None)
                             plan.pop("logged_bomb_action", None)
-                            logger.info(f"🗑️ ĐÃ XÓA just_completed và plan_type sau khi đặt bom")
                             
                             return True
                     else:
                         if not plan.get("logged_bomb_action"):
-                            logger.info(f"✅ PATH HOÀN THÀNH - KHÔNG ĐẶT BOM: Plan type = {plan_type}")
                             plan["logged_bomb_action"] = True
                 return False
             else:
@@ -246,19 +223,16 @@ class BotController:
         # Đặt bom tại target nếu cần
         if plan.get("need_bomb_at_target"):
             target_cell = plan["need_bomb_at_target"]
-            logger.info(f"💣 ĐẶT BOM NGAY TẠI: {target_cell}")
             await send_bomb_func()
             
             # Set escape flag
             survival_ai.must_escape_bomb = True
-            logger.warning(f"⚡ SET FLAG: must_escape_bomb = True")
             
             plan.pop("need_bomb_at_target", None)
             plan["bomb_placed"] = True
             return True
         
         return False
-
 
 # Global controller instance
 bot_controller = BotController()

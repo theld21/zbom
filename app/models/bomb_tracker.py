@@ -33,7 +33,6 @@ class BombInfo:
         """Thời gian còn lại đến khi nổ (ms)"""
         return max(0, self.will_explode_at() - current_time)
 
-
 class BombTracker:
     """
     Quản lý tất cả bom đang hoạt động và vùng nổ của chúng
@@ -170,10 +169,8 @@ class BombTracker:
         for bomb in self.bombs.values():
             self._all_blast_zones.update(bomb.blast_zone)
 
-
 # Global bomb tracker instance
 _bomb_tracker = BombTracker()
-
 
 def get_bomb_tracker() -> BombTracker:
     """Lấy global bomb tracker instance"""

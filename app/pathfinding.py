@@ -8,7 +8,6 @@ from typing import Tuple, Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
-
 # ============ ESCAPE PLANNING ============
 
 def calculate_escape_time(path_length: int, bot_speed: int) -> float:
@@ -20,7 +19,6 @@ def calculate_escape_time(path_length: int, bot_speed: int) -> float:
     time_needed = steps_needed * 10  # 10ms per step
     
     return time_needed * 1.5  # Safety margin 50%
-
 
 def calculate_blast_zone(bomb_position: Tuple[int, int], explosion_range: int) -> set:
     """Tính vùng nổ của bom"""
@@ -53,7 +51,6 @@ def calculate_blast_zone(bomb_position: Tuple[int, int], explosion_range: int) -
     
     return blast_zone
 
-
 def find_nearest_safe_cells(
     bot_position: Tuple[int, int],
     blast_zone: set,
@@ -80,7 +77,6 @@ def find_nearest_safe_cells(
     
     return safe_cells
 
-
 def find_escape_path_from_bomb(
     bomb_position: Tuple[int, int],
     bot_position: Tuple[int, int],
@@ -94,7 +90,6 @@ def find_escape_path_from_bomb(
     safe_cells = find_nearest_safe_cells(bomb_position, blast_zone, max_distance=8)
     
     if not safe_cells:
-        logger.warning(f"⚠️ KHÔNG TÌM THẤY Ô AN TOÀN ngoài blast zone của {bomb_position}")
         return None
     
     my_uid = game_state.get("my_uid")
@@ -130,20 +125,15 @@ def find_escape_path_from_bomb(
                         if escape_time < best_time:
                             best_time = escape_time
                             best_path = path
-                            logger.info(f"✅ CHỌN RISKY PATH: {len(path)} ô, {escape_time:.0f}ms (đi qua hazard)")
-                    else:
-                        logger.warning(f"⚠️ RISKY PATH: Không đủ thời gian đi qua hazard")
                 else:
                     # Safe path - luôn OK
                     if escape_time < best_time:
                         best_time = escape_time
                         best_path = path
-                        logger.info(f"✅ CHỌN SAFE PATH: {len(path)} ô, {escape_time:.0f}ms")
     
     if best_path:
         return (best_path, best_time)
     return None
-
 
 def _can_safely_traverse_hazard_path(path: List[Tuple[int, int]], bot_speed: float, bomb_lifetime: float) -> bool:
     """Kiểm tra có thể đi qua hazard path an toàn không"""
@@ -172,12 +162,10 @@ def _can_safely_traverse_hazard_path(path: List[Tuple[int, int]], bot_speed: flo
                 explosion_tick = fs.dynamic.hazard_until[cy, cx]
                 arrival_tick = int((current_time + total_time) / 100)  # Convert ms to tick
                 if arrival_tick >= explosion_tick:
-                    logger.warning(f"⚠️ Ô {cell} sẽ nổ tick {explosion_tick}, bot đến tick {arrival_tick}")
                     return False
     
     # logger.info(f"✅ CÓ THỂ đi qua hazard path: tổng {total_time:.0f}ms < bom nổ {bomb_lifetime:.0f}ms")  # Giảm log spam
     return True
-
 
 def is_safe_to_place_bomb(
     bomb_position: Tuple[int, int],
@@ -190,7 +178,6 @@ def is_safe_to_place_bomb(
         bomb_position, bot_position, explosion_range, bomb_lifetime
     )
     return result is not None
-
 
 # ============ BOMBING POSITIONS ============
 
@@ -213,7 +200,6 @@ def find_best_bombing_position(
     chests = find_chests_in_range(current_position, max_search_radius)
     
     if not chests:
-        logger.info(f"🔍 KHÔNG CÓ RƯƠNG trong tầm {max_search_radius}")
         return None
     
     # Đánh giá từng vị trí
@@ -241,7 +227,6 @@ def find_best_bombing_position(
             
             # Check escape
             if not is_safe_to_place_bomb(bomb_pos, current_position, explosion_range):
-                logger.warning(f"⚠️ BỎ QUA {bomb_pos}: không có đường thoát")
                 continue
             
             # Tính điểm
@@ -249,17 +234,13 @@ def find_best_bombing_position(
             candidates.append((bomb_pos, score, chest))
     
     if not candidates:
-        logger.warning("⚠️ KHÔNG CÓ VỊ TRÍ ĐẶT BOM AN TOÀN")
         return None
     
     # Chọn tốt nhất
     candidates.sort(key=lambda x: x[1], reverse=True)
     best_pos, best_score, target_chest = candidates[0]
-    
-    logger.info(f"✅ VỊ TRÍ ĐẶT BOM TỐT NHẤT: {best_pos} → {target_chest}, score={best_score:.1f}")
-    
-    return best_pos
 
+    return best_pos
 
 def get_bomb_positions_for_target(target: Tuple[int, int], explosion_range: int) -> List[Tuple[int, int]]:
     """Tìm các vị trí có thể đặt bom để nổ target"""
@@ -295,7 +276,6 @@ def get_bomb_positions_for_target(target: Tuple[int, int], explosion_range: int)
                 positions.append(bomb_pos)
     
     return positions
-
 
 def calculate_bombing_score(
     bomb_position: Tuple[int, int],
@@ -337,7 +317,6 @@ def calculate_bombing_score(
     
     return score
 
-
 def count_targets_in_blast(bomb_position: Tuple[int, int], explosion_range: int) -> List[Tuple[int, int]]:
     """Đếm số targets trong vùng nổ"""
     from .game_state import game_state, pos_to_cell
@@ -372,7 +351,6 @@ def count_targets_in_blast(bomb_position: Tuple[int, int], explosion_range: int)
     
     return targets
 
-
 # ============ NAVIGATION ============
 
 def is_cell_passable(cell: Tuple[int, int], avoid_bombs: bool = False) -> bool:
@@ -402,7 +380,6 @@ def is_cell_passable(cell: Tuple[int, int], avoid_bombs: bool = False) -> bool:
     except Exception:
         return False
 
-
 def is_in_danger(cell: Tuple[int, int], current_time: float) -> bool:
     """Kiểm tra ô có nguy hiểm không"""
     from .game_state import get_fast_state
@@ -418,7 +395,6 @@ def is_in_danger(cell: Tuple[int, int], current_time: float) -> bool:
     if not fs.static.in_bounds(cx, cy):
         return True
     return fs.dynamic.hazard_until[cy, cx] > now_tick
-
 
 def has_dangerous_bombs_nearby(cell: Tuple[int, int], current_time: float, radius: int = 3) -> bool:
     """Kiểm tra có bom nguy hiểm gần không"""
@@ -437,12 +413,10 @@ def has_dangerous_bombs_nearby(cell: Tuple[int, int], current_time: float, radiu
                 remaining = life_time - elapsed
                 
                 if remaining <= 3.0:
-                    logger.info(f"⚠️ BOM NGUY HIỂM: tại {bomb_cell}, còn {remaining:.1f}s")
                     return True
     except Exception as e:
-        logger.error(f"Lỗi kiểm tra bom: {e}")
+        pass
     return False
-
 
 def find_safe_cells(current_cell: Tuple[int, int], current_time: float, radius: int = 6) -> List[Tuple[int, int]]:
     """Tìm các ô an toàn gần"""
@@ -455,7 +429,6 @@ def find_safe_cells(current_cell: Tuple[int, int], current_time: float, radius: 
                 safe_cells.append(check_cell)
     return safe_cells
 
-
 def can_reach_goal(current_cell: Tuple[int, int], goal_cell: Tuple[int, int]) -> bool:
     """Kiểm tra có thể đến goal không"""
     from .game_state import bfs_shortest_path
@@ -465,7 +438,6 @@ def can_reach_goal(current_cell: Tuple[int, int], goal_cell: Tuple[int, int]) ->
         return path is not None and len(path) >= 2
     except Exception:
         return False
-
 
 # ============ BOMBING HELPERS ============
 
@@ -492,14 +464,11 @@ def has_chest_in_bomb_range(cell: Tuple[int, int]) -> bool:
                     break
                 
                 if has_chest_at_tile(check_cell[0], check_cell[1]):
-                    logger.info(f"💎 RƯƠNG TRONG TẦM NỔ: {check_cell} ({direction}, {distance})")
                     return True
         
         return False
     except Exception as e:
-        logger.error(f"❌ Lỗi kiểm tra tầm nổ: {e}")
         return False
-
 
 def has_escape_after_bomb(cell: Tuple[int, int]) -> bool:
     """Kiểm tra có lối thoát sau khi đặt bom không"""
@@ -532,9 +501,7 @@ def has_escape_after_bomb(cell: Tuple[int, int]) -> bool:
         
         return len(safe_cells) > 0
     except Exception as e:
-        logger.error(f"❌ Lỗi kiểm tra lối thoát: {e}")
         return False
-
 
 def find_chests_in_range(current_cell: Tuple[int, int], max_range: int) -> List[Tuple[int, int]]:
     """Tìm rương trong tầm"""
@@ -553,9 +520,8 @@ def find_chests_in_range(current_cell: Tuple[int, int], max_range: int) -> List[
                 if distance <= max_range:
                     chests.append(chest_cell)
     except Exception as e:
-        logger.error(f"❌ Lỗi tìm rương: {e}")
+        pass
     return chests
-
 
 def should_place_bomb_now(
     current_position: Tuple[int, int],
@@ -575,14 +541,10 @@ def should_place_bomb_now(
     explosion_range = get_bomber_explosion_range(my_uid)
     
     if not has_chest_in_bomb_range(current_position):
-        logger.warning("⚠️ KHÔNG ĐẶT BOM: Không có rương")
         return False
     
     if not is_safe_to_place_bomb(current_position, current_position, explosion_range):
-        logger.warning("⚠️ KHÔNG ĐẶT BOM: Không có đường thoát")
         return False
     
-    logger.info("✅ AN TOÀN ĐẶT BOM")
     return True
-
 
