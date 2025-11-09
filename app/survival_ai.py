@@ -146,11 +146,12 @@ class SimpleSurvivalAI:
     def _get_exploration_targets(self, current_cell: Tuple[int, int]) -> List[Tuple[int, int]]:
         """Tìm các mục tiêu khám phá chưa được thăm"""
         targets = []
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for dx in range(-self.exploration_radius, self.exploration_radius + 1):
             for dy in range(-self.exploration_radius, self.exploration_radius + 1):
                 if dx == 0 and dy == 0:
                     continue
-                target = (current_cell[0] + dx, current_cell[1] + dy)
+                target = (current_cell_int[0] + dx, current_cell_int[1] + dy)
                 if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                     target not in self.visited_cells and 
                     self._is_cell_passable(target)):
@@ -162,10 +163,11 @@ class SimpleSurvivalAI:
         # Kiểm tra vị trí hiện tại có hợp lệ không
         if not (0 <= current_cell[0] <= 15 and 0 <= current_cell[1] <= 15):
             # Tìm vị trí an toàn gần nhất trong map
+            current_cell_int = (int(current_cell[0]), int(current_cell[1]))
             for radius in range(1, 8):
                 for dx in range(-radius, radius + 1):
                     for dy in range(-radius, radius + 1):
-                        target = (current_cell[0] + dx, current_cell[1] + dy)
+                        target = (current_cell_int[0] + dx, current_cell_int[1] + dy)
                         if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and 
                             self._is_cell_passable(target)):
                             return target
@@ -396,11 +398,12 @@ class SimpleSurvivalAI:
         """Tìm các khu vực an toàn"""
         safe_areas = []
         current_time = time.time() * 1000
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for dx in range(-radius, radius + 1):
             for dy in range(-radius, radius + 1):
                 if dx == 0 and dy == 0:
                     continue
-                target = (current_cell[0] + dx, current_cell[1] + dy)
+                target = (current_cell_int[0] + dx, current_cell_int[1] + dy)
                 if (self._in_bounds(target[0], target[1]) and 
                     self._is_cell_passable(target) and 
                     not self._is_in_danger(target, current_time)):
@@ -524,9 +527,10 @@ class SimpleSurvivalAI:
                 self.last_action_time = current_time
                 return escape_move
             # Nếu không tìm được đường thoát, cố gắng di chuyển bất kỳ hướng nào
+            current_cell_int = (int(current_cell[0]), int(current_cell[1]))
             for direction in ["UP", "DOWN", "LEFT", "RIGHT"]:
                 dx, dy = DIRECTIONS[direction]
-                next_cell = (current_cell[0] + dx, current_cell[1] + dy)
+                next_cell = (current_cell_int[0] + dx, current_cell_int[1] + dy)
                 if self._is_cell_passable(next_cell):
                     self.last_action_time = current_time
                     return {"type": "move", "goal_cell": next_cell}
@@ -681,9 +685,10 @@ class SimpleSurvivalAI:
         best_score = -1
         
         # Kiểm tra các hướng di chuyển có thể
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for direction in ["UP", "DOWN", "LEFT", "RIGHT"]:
             dx, dy = DIRECTIONS[direction]
-            next_cell = (current_cell[0] + dx, current_cell[1] + dy)
+            next_cell = (current_cell_int[0] + dx, current_cell_int[1] + dy)
             
             # Kiểm tra ô có thể đi được không
             if not self._is_cell_passable(next_cell):
@@ -755,11 +760,12 @@ class SimpleSurvivalAI:
     def _count_open_spaces(self, cell: Tuple[int, int], radius: int = 2) -> int:
         """Đếm số ô trống xung quanh"""
         count = 0
+        cell_int = (int(cell[0]), int(cell[1]))
         for dx in range(-radius, radius + 1):
             for dy in range(-radius, radius + 1):
                 if dx == 0 and dy == 0:
                     continue
-                check_cell = (cell[0] + dx, cell[1] + dy)
+                check_cell = (cell_int[0] + dx, cell_int[1] + dy)
                 if self._is_cell_passable(check_cell):
                     count += 1
         return count
@@ -858,9 +864,10 @@ class SimpleSurvivalAI:
         # Fallback: tìm ô an toàn gần nhất
         best_move = None
         best_score = -1
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for direction in ["UP", "DOWN", "LEFT", "RIGHT"]:
             dx, dy = DIRECTIONS[direction]
-            next_cell = (current_cell[0] + dx, current_cell[1] + dy)
+            next_cell = (current_cell_int[0] + dx, current_cell_int[1] + dy)
             if not self._is_cell_passable(next_cell):
                 continue
             score = 100.0 if not self._is_in_danger(next_cell, current_time) else 0.0
@@ -887,13 +894,14 @@ class SimpleSurvivalAI:
         # QUAN TRỌNG: Kiểm tra bot có đang trong vùng nguy hiểm không!
         if self._is_in_danger(cell, current_time):
             # Tìm ô an toàn gần nhất để thoát
+            cell_int = (int(cell[0]), int(cell[1]))
             for radius in range(1, 4):  # Chỉ tìm trong 3 bước để thoát nhanh
                 candidates = []
                 for dx in range(-radius, radius + 1):
                     for dy in range(-radius, radius + 1):
                         if dx == 0 and dy == 0:
                             continue
-                        target = (cell[0] + dx, cell[1] + dy)
+                        target = (cell_int[0] + dx, cell_int[1] + dy)
                         if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                             target != cell):
                             # DEBUG: Chỉ log khi không tìm thấy candidate nào
@@ -938,13 +946,14 @@ class SimpleSurvivalAI:
                         self.current_plan = None
                         
                         # Tìm ô an toàn gần nhất để thoát
+                        cell_int = (int(cell[0]), int(cell[1]))
                         for radius in range(1, 4):  # Chỉ tìm trong 3 bước để thoát nhanh
                             candidates = []
                             for dx in range(-radius, radius + 1):
                                 for dy in range(-radius, radius + 1):
                                     if dx == 0 and dy == 0:
                                         continue
-                                    target = (cell[0] + dx, cell[1] + dy)
+                                    target = (cell_int[0] + dx, cell_int[1] + dy)
                                     if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                                         target != cell):
                                         is_passable = self._is_cell_passable(target)
@@ -974,11 +983,12 @@ class SimpleSurvivalAI:
         # QUAN TRỌNG: XÓA MỌI PLAN khi vào emergency!
         self.current_plan = None
         
+        cell_int = (int(cell[0]), int(cell[1]))
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 if dx == 0 and dy == 0:
                     continue
-                target = (cell[0] + dx, cell[1] + dy)
+                target = (cell_int[0] + dx, cell_int[1] + dy)
                 if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                     self._is_cell_passable(target) and 
                     not self._is_in_danger(target, current_time + 2000) and
@@ -986,7 +996,6 @@ class SimpleSurvivalAI:
                     
                     # QUAN TRỌNG: Kiểm tra pathfinding trước khi chọn!
                     from .game_state import bfs_shortest_path
-                    cell_int = (int(cell[0]), int(cell[1]))
                     test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                     if test_path and len(test_path) >= 1:
                         return target
@@ -996,18 +1005,18 @@ class SimpleSurvivalAI:
         # QUAN TRỌNG: XÓA MỌI PLAN khi vào cuối cùng!
         self.current_plan = None
         
+        cell_int = (int(cell[0]), int(cell[1]))
         for dx in [-1, 0, 1]:
             for dy in [-1, 0, 1]:
                 if dx == 0 and dy == 0:
                     continue
-                target = (cell[0] + dx, cell[1] + dy)
+                target = (cell_int[0] + dx, cell_int[1] + dy)
                 if (0 <= target[0] <= 15 and 0 <= target[1] <= 15 and
                     self._is_cell_passable(target) and
                     not self._is_position_blacklisted(target, current_time)):
                     
                     # QUAN TRỌNG: Kiểm tra pathfinding trước khi chọn!
                     from .game_state import bfs_shortest_path
-                    cell_int = (int(cell[0]), int(cell[1]))
                     test_path = bfs_shortest_path(cell_int, target, avoid_hazard=True, avoid_bots=False)
                     if test_path and len(test_path) >= 1:
                         return target
@@ -1195,8 +1204,9 @@ class SimpleSurvivalAI:
             
         # Kiểm tra có rương kề cạnh không
         adjacent_chest = False
+        current_cell_int = (int(current_cell[0]), int(current_cell[1]))
         for dx, dy in DIRECTIONS.values():
-            nx, ny = current_cell[0] + dx, current_cell[1] + dy
+            nx, ny = current_cell_int[0] + dx, current_cell_int[1] + dy
             if has_chest_at_tile(nx, ny):
                 adjacent_chest = True
                 break
